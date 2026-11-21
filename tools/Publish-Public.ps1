@@ -47,7 +47,7 @@ Get-ChildItem $pub -Recurse -Filter *.pdf | Remove-Item -Force
 git -C $pub add -A
 $changes = git -C $pub status --porcelain
 if ($changes) {
-    git -C $pub -c user.name=$login -c user.email=$email commit -q -m "DmxLicht $version"
+    git -C $pub -c user.name=$login -c user.email=$email commit -q -m "DMX Light Control $version"
 } else { Write-Host "No code changes." }
 if (-not $exists) {
     gh repo create $Repo --public --source $pub --push --description "DMX lighting control for Windows: uDMX, Art-Net, sACN, effects, timeline, phone control, Home Assistant, ambilight" | Out-Null
@@ -59,7 +59,11 @@ if (-not $exists) {
 if ($Release) {
     $z = "publish\DmxLicht-$version.zip"; $s = "$z.sha256"
     if (-not (Test-Path $z) -or -not (Test-Path $s)) { throw "Run Bouwen.bat first: $z and $s are needed." }
-    if (-not $Notes) { $Notes = "DmxLicht $version" }
-    gh release create "v$version" $z $s --repo $Repo --title "DmxLicht $version" --notes $Notes --target main
+    if (-not $Notes) { $Notes = "DMX Light Control $version" }
+    # the notes go through a file: quotes in them can never break the command line
+    $nf = Join-Path $env:TEMP "dlc-release-notes.md"
+    [IO.File]::WriteAllText($nf, $Notes, (New-Object Text.UTF8Encoding $false))
+    gh release create "v$version" $z $s --repo $Repo --title "DMX Light Control $version" --notes-file $nf --target main
+    Remove-Item $nf -ErrorAction SilentlyContinue
 }
 Write-Host "Done: https://github.com/$Repo"
