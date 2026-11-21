@@ -47,6 +47,7 @@ export function CompanionCard() {
         <button className="btn ghost" onClick={refresh}><Icon name="refresh" /></button>
       </div>
       {msg && <div className={"note" + (msg.ok ? "" : " warn")}><Icon name={msg.ok ? "info" : "warn"} />{msg.text}</div>}
+      {st?.installedVersion && <p className="hint">{t("cm.noActions")}</p>}
       {st && <p className="hint mono" style={{ fontSize: 11 }}>{st.modulesDir}</p>}
     </div>
   );

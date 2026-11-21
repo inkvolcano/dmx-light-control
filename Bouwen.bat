@@ -47,7 +47,6 @@ copy /y companion-module\main.js %CM%\ >nul
 copy /y companion-module\package.json %CM%\ >nul
 copy /y companion-module\README.md %CM%\ >nul
 copy /y companion-module\companion\manifest.json %CM%\companion\ >nul
-powershell -NoProfile -Command "foreach ($f in '%CM%\package.json','%CM%\companion\manifest.json') { $j=Get-Content $f -Raw; $j=$j -replace '\"version\": \"[0-9.]+\"', '\"version\": \"%VERSION%\"'; [IO.File]::WriteAllText((Resolve-Path $f), $j) }" || goto fail
 robocopy companion-module\node_modules %CM%\node_modules /E /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto fail
 
@@ -80,8 +79,9 @@ move %STAGE% %OUT% >nul || goto fail
 if exist %OUT%-oud rmdir /s /q %OUT%-oud
 
 :done
-rem gelukt: dit nummer bewaren (ook in de interface en de Companion-module)
-powershell -NoProfile -Command "[IO.File]::WriteAllText('version.txt', '%VERSION%' + [Environment]::NewLine); foreach ($f in 'ui\package.json','companion-module\package.json','companion-module\companion\manifest.json') { $j=Get-Content $f -Raw; $j=$j -replace '\"version\": \"[0-9.]+\"', '\"version\": \"%VERSION%\"'; [IO.File]::WriteAllText((Resolve-Path $f), $j) }"
+rem gelukt: dit nummer bewaren (ook in de interface). De Companion-module houdt een vast nummer:
+rem een verbinding in Companion staat vast op de versie waarmee hij is toegevoegd.
+powershell -NoProfile -Command "[IO.File]::WriteAllText('version.txt', '%VERSION%' + [Environment]::NewLine); foreach ($f in 'ui\package.json') { $j=Get-Content $f -Raw; $j=$j -replace '\"version\": \"[0-9.]+\"', '\"version\": \"%VERSION%\"'; [IO.File]::WriteAllText((Resolve-Path $f), $j) }"
 echo.
 echo Klaar: publish\DMX-Light-Control-%VERSION%.zip
 echo Uitpakken op de andere pc en DmxLicht.exe starten.
