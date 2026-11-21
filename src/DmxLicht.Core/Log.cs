@@ -61,7 +61,7 @@ public static class Log
             Directory.CreateDirectory(CrashDir);
             string path = Path.Combine(CrashDir, "crash-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".txt");
             string text =
-                "DmxLicht crash\r\n" +
+                "Glowsmith crash\r\n" +
                 "Tijd:      " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\r\n" +
                 "Waar:      " + where + "\r\n" +
                 "Versie:    " + AppVersion + "\r\n" +

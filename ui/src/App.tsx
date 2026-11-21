@@ -116,7 +116,7 @@ export function App() {
   return (
     <div className="shell">
       <nav className="sidebar">
-        <div className="brand" title="DmxLicht"><div className="brand-dot" /></div>
+        <div className="brand" title="Glowsmith"><div className="brand-dot" /></div>
         {pages.map((p) => (
           <button key={p.id} className={"nav-btn" + (page === p.id ? " active" : "")} onClick={() => setPage(p.id)}>
             <Icon name={p.icon} />

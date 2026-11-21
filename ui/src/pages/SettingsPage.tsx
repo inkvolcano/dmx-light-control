@@ -95,7 +95,7 @@ export function SettingsPage() {
 
         <div className="card stack">
           <h2>{t("settings.about")}</h2>
-          <p className="hint">DmxLicht · {t("settings.version", { v: boot!.version })}</p>
+          <p className="hint">Glowsmith · {t("settings.version", { v: boot!.version })}</p>
         </div>
       </div>
     </div>

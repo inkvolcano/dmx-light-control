@@ -272,7 +272,17 @@ public sealed class UdmxOutput : IDmxOutput
                     fault = f.ToString();
                     error = ex.Message;
                     status = "Geen verbinding: " + ex.Message + " Ik probeer het opnieuw...";
-                    if (ex.Message != lastConnectError) { lastConnectError = ex.Message; Log.Write("Verbinden mislukt: " + ex.Message); }
+                    if (droppedJustNow && f == UdmxFault.NotFound)
+                    {
+                        // gone right after a working connection: Windows no longer sees it on USB at all
+                        lastConnectError = ex.Message;
+                        status = "De dongle is van de USB-bus verdwenen. Steek hem opnieuw in; ik maak vanzelf weer verbinding.";
+                        error = status;
+                        Log.Write("uDMX is van de USB-bus verdwenen: Windows ziet hem niet meer (stekker, kabel, USB-poort, " +
+                                  "stroom of een storing via de DMX-kabel). Opnieuw insteken helpt; ik maak dan vanzelf weer verbinding.");
+                    }
+                    else if (ex.Message != lastConnectError) { lastConnectError = ex.Message; Log.Write("Verbinden mislukt: " + ex.Message); }
+                    droppedJustNow = false;
                     int wait = f == UdmxFault.NotFound ? opt.NotFoundPollMs
                              : Math.Min(opt.ReconnectMaxMs, opt.ReconnectMinMs << Math.Min(attempt++, 6));
                     Wait(wait);
@@ -342,6 +352,9 @@ public sealed class UdmxOutput : IDmxOutput
         if (gen == generation || !run) Drop(null);   // stopped: close the dongle; replaced: leave it to the new loop
     }
 
+    /// <summary>Set when a working connection is lost; the next attempt tells "gone from USB" apart from other faults.</summary>
+    volatile bool droppedJustNow;
+
     void Drop(string reason)
     {
         if (dev != null)
@@ -351,6 +364,7 @@ public sealed class UdmxOutput : IDmxOutput
             if (reason != null)
             {
                 NoteDrop();
+                droppedJustNow = true;
                 string up = connectedSince is DateTime t ? " na " + Duration(DateTime.Now - t) : "";
                 Log.Write("Verbinding met uDMX weg" + up + ": " + reason);
                 status = "Verbinding verbroken - opnieuw verbinden...";

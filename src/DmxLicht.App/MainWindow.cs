@@ -17,7 +17,7 @@ sealed class MainWindow : Form
     public MainWindow(string url)
     {
         this.url = url;
-        Text = "DmxLicht";
+        Text = "Glowsmith";
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
         BackColor = Color.FromArgb(24, 24, 27);
         StartPosition = FormStartPosition.CenterScreen;
@@ -46,6 +46,8 @@ sealed class MainWindow : Form
             view.CoreWebView2.DocumentTitleChanged += (_, _) => Text = view.CoreWebView2.DocumentTitle;
             // links to other sites open in the normal browser
             view.CoreWebView2.NewWindowRequested += (_, a) => { a.Handled = true; Program.OpenInBrowser(a.Uri); };
+            view.CoreWebView2.ProcessFailed += (_, a) =>
+                Log.Write("Venster (WebView2) fout: " + a.ProcessFailedKind + " / " + a.Reason + " (exit " + a.ExitCode + ")");
             view.CoreWebView2.Navigate(url);
         }
         catch (Exception ex)
@@ -73,7 +75,7 @@ sealed class TrayContext : ApplicationContext
         menu.Items.Add("Afsluiten / Quit", null, (_, _) => ExitThread());
         icon = new NotifyIcon
         {
-            Text = "DmxLicht",
+            Text = "Glowsmith",
             Icon = SafeIcon(),
             ContextMenuStrip = menu,
             Visible = true,

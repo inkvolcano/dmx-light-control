@@ -72,10 +72,10 @@ static class Program
         using var single = new Mutex(true, @"Local\DmxLicht.Output", out bool firstInstance);
         if (!firstInstance && !args.Contains("--allow-second"))
         {
-            const string msg = "DmxLicht draait al op deze pc (kijk in de taakbalk of bij de klok).\n" +
-                               "DmxLicht is already running on this PC.";
+            const string msg = "Glowsmith draait al op deze pc (kijk in de taakbalk of bij de klok).\n" +
+                               "Glowsmith is already running on this PC.";
             if (headless) Console.Error.WriteLine(msg);
-            else MessageBox.Show(msg, "DmxLicht", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else MessageBox.Show(msg, "Glowsmith", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -84,7 +84,10 @@ static class Program
         Application.ThreadException += (_, e) => Log.Crash("venster", e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Crash(e.IsTerminating ? "app (afgesloten)" : "app", e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Crash("achtergrondtaak", e.Exception); e.SetObserved(); };
-        Log.Write("DmxLicht " + Log.AppVersion + " start op " + Environment.OSVersion);
+        Log.Write("Glowsmith " + Log.AppVersion + " start op " + Environment.OSVersion);
+        // every normal end leaves a line; a log that just stops means the app was killed or crashed hard
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Log.Write("Glowsmith afgesloten");
+        AppHealth.StartStallWatch();
 
         ShowFile show = LoadShow();
         var udmx = new UdmxOutput { MinIntervalMs = show.Settings.DongleIntervalMs };
@@ -146,7 +149,7 @@ static class Program
         {
             if (headless)
             {
-                Console.WriteLine("DmxLicht draait op " + url + " (Ctrl+C om te stoppen)");
+                Console.WriteLine("Glowsmith draait op " + url + " (Ctrl+C om te stoppen)");
                 var done = new ManualResetEventSlim();
                 ExitApp = done.Set;
                 Console.CancelKeyPress += (_, e) => { e.Cancel = true; done.Set(); };
@@ -263,15 +266,19 @@ static class Program
     }
 }
 
-/// <summary>Keeps Windows from sleeping while the app runs (sleep would cut the USB dongle).</summary>
+/// <summary>
+/// Keeps Windows from sleeping while the app runs (sleep cuts the USB dongle). Keeps the screen on too: on laptops
+/// with Modern Standby the screen switching off after the idle time is what puts the PC to sleep, and "system
+/// required" alone does not stop that.
+/// </summary>
 static class KeepAwake
 {
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
     static extern uint SetThreadExecutionState(uint flags);
-    const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x00000001;
+    const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x00000001, ES_DISPLAY_REQUIRED = 0x00000002;
 
     // Called from the main thread, which lives as long as the app.
-    public static void On() => SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+    public static void On() => SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
     public static void Off() => SetThreadExecutionState(ES_CONTINUOUS);
 }
 

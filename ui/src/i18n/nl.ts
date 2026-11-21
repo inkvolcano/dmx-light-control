@@ -1,7 +1,7 @@
 import { helpNl } from "./help.nl";
 // Nederlands. Kleur- en effectnamen komen in het Nederlands van de server (fallback), dus die staan hier niet.
 export const nl: Record<string, string> = {
-  "app.name": "DmxLicht",
+  "app.name": "Glowsmith",
   "nav.live": "Bediening",
   "nav.effects": "Effecten",
   "nav.faders": "Faders",
@@ -133,7 +133,7 @@ export const nl: Record<string, string> = {
   "common.lamp": "Lamp",
 
   // output diagnostics
-  "settings.preventSleep": "Slaapstand voorkomen zolang DmxLicht draait (slaapstand verbreekt de dongle)",
+  "settings.preventSleep": "Slaapstand voorkomen zolang Glowsmith draait; houdt ook het scherm aan (op veel laptops laat scherm-uit de pc slapen, en slaapstand verbreekt de dongle)",
   "faultShort.NotFound": "Geen {name}",
   "faultShort.DriverMissing": "{name}: driver ontbreekt",
   "faultShort.InUse": "{name} in gebruik",
@@ -388,7 +388,7 @@ export const nl: Record<string, string> = {
 
   // companion install
   "cm.title": "Stream Deck (Companion)",
-  "cm.hint": "De Companion-module zit bij DmxLicht. Eén klik en hij staat in Bitfocus Companion: knoppen voor scènes, blackout, flash, tap en meer.",
+  "cm.hint": "De Companion-module zit bij Glowsmith. Eén klik en hij staat in Bitfocus Companion: knoppen voor scènes, blackout, flash, tap en meer.",
   "cm.companion": "Companion",
   "cm.found": "gevonden",
   "cm.running": "gevonden, draait nu",
@@ -401,8 +401,8 @@ export const nl: Record<string, string> = {
   "cm.update": "Bijwerken in Companion",
   "cm.reinstall": "Opnieuw installeren",
   "cm.installing": "Installeren...",
-  "cm.done": "Geïnstalleerd. Start Companion en voeg de verbinding 'DmxLicht' toe.",
-  "cm.doneRestart": "Geïnstalleerd. Herstart Companion en voeg daarna de verbinding 'DmxLicht' toe.",
+  "cm.done": "Geïnstalleerd. Start Companion en voeg de verbinding 'Glowsmith' toe.",
+  "cm.doneRestart": "Geïnstalleerd. Herstart Companion en voeg daarna de verbinding 'Glowsmith' toe.",
   "cm.installCompanion": "Installeer eerst Bitfocus Companion (bitfocus.io/companion) en start het één keer; daarna kan de module erin.",
 
   // sound effects

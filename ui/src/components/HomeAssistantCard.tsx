@@ -5,7 +5,7 @@ import { updateSettings, useShow } from "../store";
 import { Help } from "./Help";
 import { Icon } from "./Icon";
 
-const DEFAULTS: MqttSettings = { enabled: false, host: "", port: 1883, user: "", password: null, prefix: "dmxlicht", discovery: "homeassistant", name: "DmxLicht" };
+const DEFAULTS: MqttSettings = { enabled: false, host: "", port: 1883, user: "", password: null, prefix: "dmxlicht", discovery: "homeassistant", name: "Glowsmith" };
 
 /** Home Assistant over MQTT: connection settings, status, steps and examples. */
 export function HomeAssistantCard() {

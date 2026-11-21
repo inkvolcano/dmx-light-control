@@ -15,7 +15,7 @@ namespace DmxLicht.App;
 
 /// <summary>
 /// Home Assistant over MQTT with discovery: the light, groups, scenes, effects, blackout, master, buttons
-/// and the dongle appear by themselves under one device "DmxLicht". Everything sent to the app goes through
+/// and the dongle appear by themselves under one device "Glowsmith". Everything sent to the app goes through
 /// the command language. Raw commands: publish e.g. <c>scene "Sfeer"</c> to <c>dmxlicht/command</c>.
 /// </summary>
 sealed class HomeAssistant : IDisposable
@@ -168,8 +168,8 @@ sealed class HomeAssistant : IDisposable
         JsonObject Device() => new()
         {
             ["identifiers"] = new JsonArray("dmxlicht-" + Environment.MachineName.ToLowerInvariant()),
-            ["name"] = string.IsNullOrWhiteSpace(active.Name) ? "DmxLicht" : active.Name,
-            ["manufacturer"] = "DmxLicht",
+            ["name"] = string.IsNullOrWhiteSpace(active.Name) ? "Glowsmith" : active.Name,
+            ["manufacturer"] = "Glowsmith",
             ["model"] = "DMX lichtbesturing",
             ["sw_version"] = Log.AppVersion,
         };
