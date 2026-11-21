@@ -180,6 +180,38 @@ public class FixtureTests
 public class EffectTests
 {
     [Fact]
+    public void SecondCollectionHasHundredUniqueCategorisedEffects()
+    {
+        Assert.Equal(66, EffectLibrary.IndexOf("audio-surge-strobe") + 1);           // the classic list stays in place
+        Assert.Equal(166, EffectLibrary.All.Count);
+        var more = EffectLibrary.All.Skip(66).ToList();
+        Assert.All(more, e => Assert.Contains(e.Category, new[] { "onoff", "chase", "smooth", "color", "theme", "nature", "party", "sound" }));
+        // names are unique too: Home Assistant and commands find effects by name
+        Assert.Equal(EffectLibrary.All.Count, EffectLibrary.All.Select(e => e.Name.ToLowerInvariant()).Distinct().Count());
+        // sound effects say so (the UI shows them under Sound and the music page)
+        Assert.All(more.Where(e => e.Category == "sound"), e => Assert.True(e.Uses.HasFlag(EffectParams.Audio) || e.Uses.HasFlag(EffectParams.Beat)));
+    }
+
+    [Fact]
+    public void NewEffectsActuallyChangeOverTime()
+    {
+        // an effect that renders the same picture at every moment is a bug (or a duplicate of "static colour")
+        var audio = new AudioFrame(0.6, 0.7, 0.5, 0.8, 3.4, false);
+        foreach (EffectDefinition e in EffectLibrary.All.Skip(66))
+        {
+            int fx = EffectLibrary.IndexOf(e.Key);
+            var s = new EffectSettings { EffectIndex = fx, StepMs = 150, OnMs = 200, OffMs = 200, DelayMs = 100 };
+            var frames = new HashSet<string>();
+            for (long ms = 0; ms < 60000; ms += 377)
+            {
+                var a = audio with { Beat = ms / 500.0, Bass = (ms % 1000) / 1000.0, High = (ms % 700) / 700.0, Mid = (ms % 900) / 900.0 };
+                frames.Add(string.Join(";", EffectLibrary.Render(s, false, ms, 8, a).Select(o => o.Color + "@" + Math.Round(o.Level, 2))));
+            }
+            Assert.True(frames.Count >= 2, e.Key + " never changes");
+        }
+    }
+
+    [Fact]
     public void EveryEffectHasAKeyAndStaysInRange()
     {
         Assert.Equal(EffectLibrary.All.Count, EffectLibrary.All.Select(e => e.Key).Distinct().Count());

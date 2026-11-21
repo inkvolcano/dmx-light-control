@@ -74,7 +74,7 @@ export function EasyView({ locked, onFull, onHelp }: { locked: boolean; onFull: 
           <span className="dot" />{output.connected ? output.name : t("easy.noDongle")}
         </span>
         <div className="grow" />
-        <button className="btn ghost icon-btn" onClick={onHelp} aria-label={t("help.button")}><Icon name="info" /></button>
+        <button className="nav-help" onClick={onHelp} title={t("help.button")} aria-label={t("help.button")}>?</button>
         <button className="btn ghost" onClick={onFull}>{locked ? <><Icon name="lock" /> {t("op.unlock")}</> : <><Icon name="layout" /> {t("easy.full")}</>}</button>
       </header>
 

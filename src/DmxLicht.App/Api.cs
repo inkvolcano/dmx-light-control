@@ -1120,6 +1120,8 @@ static class Api
             key = e.Key,
             name = e.Name,
             uses = Enum.GetValues<EffectParams>().Where(p => p != EffectParams.None && e.Uses.HasFlag(p)).Select(p => p.ToString()),
+            category = e.Category,
+            swatch = e.Swatch,
         }),
     };
 

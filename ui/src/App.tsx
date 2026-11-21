@@ -127,9 +127,8 @@ export function App() {
         <button className="nav-btn" onClick={() => setEasy(true)} title={t("easy.switchHint")}>
           <Icon name="grid" />{t("easy.button")}
         </button>
-        <button className={"nav-btn" + (help ? " active" : "")} onClick={toggleHelp} title="F1">
-          <Icon name="info" />{t("help.button")}
-        </button>
+        {/* help stays out of the way: a small ? (or F1) */}
+        <button className={"nav-help" + (help ? " active" : "")} onClick={toggleHelp} title={t("help.button") + " (F1)"} aria-label={t("help.button")}>?</button>
         {full?.settings.locked && (
           <button className="nav-btn" onClick={lock} title={t("op.lockNow")}><Icon name="lock" />{t("op.lock")}</button>
         )}

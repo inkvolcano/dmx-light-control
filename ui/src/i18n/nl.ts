@@ -61,6 +61,8 @@ export const nl: Record<string, string> = {
   "fxcat.smooth": "Vloeiend",
   "fxcat.color": "Kleur",
   "fxcat.theme": "Sfeer & thema",
+  "fxcat.nature": "Natuur",
+  "fxcat.party": "Feest",
 
   "faders.title": "Faders",
   "faders.hint": "Faders sturen de kanalen direct; de helderheid bovenaan telt hier niet mee.",

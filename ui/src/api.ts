@@ -231,7 +231,8 @@ export interface FullState {
 
 export interface PaletteColor { key: string; name: string; hex: string }
 export type EffectParam = "ColorA" | "ColorB" | "Step" | "OnOff" | "Delay" | "Audio" | "Beat";
-export interface EffectInfo { index: number; key: string; name: string; uses: EffectParam[] }
+/** category / swatch: set by the server for the second effect collection (the classic ones are grouped in the UI). */
+export interface EffectInfo { index: number; key: string; name: string; uses: EffectParam[]; category?: string | null; swatch?: string | null }
 
 export interface Bootstrap {
   version: string;

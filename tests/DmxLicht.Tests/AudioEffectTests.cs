@@ -17,7 +17,7 @@ public class AudioEffectTests
     public void AllSoundEffectsExistAndStayInRange()
     {
         var keys = EffectLibrary.All.Where(e => e.Uses.HasFlag(EffectParams.Audio) || e.Uses.HasFlag(EffectParams.Beat)).Select(e => e.Key).ToList();
-        Assert.Equal(14, keys.Count);
+        Assert.Equal(21, keys.Count);   // 14 classic + 7 from the second collection
         var r = new Random(1);
         foreach (string k in keys)
             foreach (int n in new[] { 1, 2, 3, 7, 24 })

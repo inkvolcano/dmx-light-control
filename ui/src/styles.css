@@ -657,3 +657,11 @@ a.btn { text-decoration: none; }
 .upd-notes { white-space: pre-wrap; font-family: inherit; font-size: 12.5px; max-height: 180px; overflow: auto; margin: 0; color: var(--muted); }
 .upd-bar { height: 8px; border-radius: 4px; background: var(--panel-3); overflow: hidden; }
 .upd-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.3s; }
+
+/* help: a small, quiet ? instead of a full menu item */
+.nav-help { align-self: center; width: 26px; height: 26px; margin: 6px 0; flex: none; border-radius: 50%; border: 1px solid var(--line-2); background: transparent;
+  color: var(--muted); font-size: 13px; font-weight: 700; line-height: 1; padding: 0; cursor: pointer; display: inline-grid; place-items: center;
+  opacity: 0.7; transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s; }
+.nav-help:hover, .nav-help.active { opacity: 1; color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.help-dot { opacity: 0.55; transition: opacity 0.15s; }
+.help-dot:hover, .help-q:focus-within .help-dot { opacity: 1; }

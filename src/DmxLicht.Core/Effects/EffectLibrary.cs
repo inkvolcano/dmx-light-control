@@ -8,6 +8,10 @@ public sealed class EffectDefinition
 {
     /// <summary>Stable id, used for translations ("blink", "fire").</summary>
     public string Key { get; internal set; }
+    /// <summary>Filter group in the UI ("chase", "nature"...); null for the classic effects (the UI groups those).</summary>
+    public string Category { get; internal set; }
+    /// <summary>Fixed colours of the effect as hex list ("#f00,#00f") for the card's colour bar; null = from colour A/B.</summary>
+    public string Swatch { get; internal set; }
     /// <summary>Dutch display name (the UI translates by <see cref="Key"/>).</summary>
     public string Name { get; }
     public EffectParams Uses { get; }
@@ -32,7 +36,10 @@ public static class EffectLibrary
     static readonly Color Cyan = Color.FromArgb(0, 255, 255);
     static readonly Color DeepBlue = Color.FromArgb(0, 0, 255);
 
-    public static readonly IReadOnlyList<EffectDefinition> All = new EffectDefinition[]
+    /// <summary>Every effect: the classic list, then the second collection (<see cref="MoreEffects"/>).</summary>
+    public static readonly IReadOnlyList<EffectDefinition> All;
+
+    static readonly EffectDefinition[] Classic =
     {
         // 0-4: aan/uit-patronen (Aan + Uit tijden)
         new("Knipperen", ColorA | OnOff, (f, i) => Lit(f.A(i), (f.Ms % f.Period) < f.On)),
@@ -378,7 +385,8 @@ public static class EffectLibrary
 
     static EffectLibrary()
     {
-        for (int i = 0; i < All.Count; i++) All[i].Key = i < Keys.Length ? Keys[i] : "fx" + i;
+        for (int i = 0; i < Classic.Length; i++) Classic[i].Key = i < Keys.Length ? Keys[i] : "fx" + i;
+        All = Classic.Concat(MoreEffects.List).ToArray();
     }
 
     public static int IndexOf(string key)
@@ -419,7 +427,12 @@ public static class EffectLibrary
         };
 
         var result = new LampOutput[n];
-        for (int i = 0; i < n; i++) result[i] = fx.Func(f, i);
+        for (int i = 0; i < n; i++)
+        {
+            LampOutput o = fx.Func(f, i);
+            // a level outside 0..1 (or NaN from a bad formula) never reaches the lamps
+            result[i] = double.IsNaN(o.Level) ? o with { Level = 0 } : o.Level is < 0 or > 1 ? o with { Level = Math.Clamp(o.Level, 0, 1) } : o;
+        }
         return result;
     }
 
@@ -431,7 +444,7 @@ public static class EffectLibrary
     static double Wave(EffectFrame f, int i) => 0.5 + 0.5 * Math.Sin(2 * Math.PI * (f.Ms / f.Cycle - i / (double)f.N));
 
     /// <summary>Like <see cref="PingPong"/> but continuous: position 0..n-1 for a fractional step.</summary>
-    static double SmoothPingPong(double step, int n)
+    internal static double SmoothPingPong(double step, int n)
     {
         if (n <= 1) return 0;
         double period = 2.0 * (n - 1);
@@ -440,7 +453,7 @@ public static class EffectLibrary
     }
 
     /// <summary>Repeatable pseudo-random 0..1 for (slot, lamp).</summary>
-    static double Noise(long slot, int i)
+    internal static double Noise(long slot, int i)
     {
         unchecked
         {

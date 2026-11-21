@@ -18,6 +18,8 @@ const categories: Record<string, string[]> = {
     "gradient-ab", "gradient-rotate", "random-breathe"],
   color: ["alternate-ab", "all-ab", "rainbow-steps", "random-flash", "random-colors", "random-ab", "disco", "sparkle"],
   theme: ["police", "fire", "snow", "sunset", "ambulance", "christmas", "fire-brigade", "waterfall", "candle", "aurora", "ocean"],
+  nature: [],
+  party: [],
   sound: ["audio-beat-colors", "audio-beat-ab", "audio-beat-random", "audio-beat-chase", "audio-spectrum", "audio-bands", "audio-vu",
     "audio-vu-center", "audio-volume-color", "audio-bass-flash", "audio-pitch-color", "audio-sparkle", "audio-fire", "audio-surge-strobe"],
 };
@@ -62,7 +64,7 @@ export function EffectsPage() {
 
   const name = (e: EffectInfo) => t("fxname." + e.key, undefined, e.name);
   const list = useMemo(() => effects.filter((e) =>
-    cat !== "own" && cat !== "screen" && (cat === "all" || categories[cat]?.includes(e.key)) &&
+    cat !== "own" && cat !== "screen" && (cat === "all" || (e.category ? e.category === cat : categories[cat]?.includes(e.key))) &&
     (!query || name(e).toLowerCase().includes(query.toLowerCase()))), [effects, cat, query, full?.settings.language]);
 
   const send = (next: EffectSettings, start = running) => {
@@ -144,14 +146,14 @@ export function EffectsPage() {
           })}
           {list.map((e) => {
             const active = running && !chase && !screen && e.index === fx.effectIndex;
-            const bar = bars[e.key] ?? (e.key.includes("rainbow") || e.key === "disco" || e.key.startsWith("random-col") ? rainbow
+            const bar = bars[e.key] ?? (e.swatch ? `linear-gradient(90deg,${e.swatch})` : e.key.includes("rainbow") || e.key === "disco" || e.key.startsWith("random-col") ? rainbow
               : e.uses.includes("ColorB") ? `linear-gradient(90deg, ${fx.colorA}, ${fx.colorB})`
               : e.uses.includes("ColorA") ? fx.colorA : rainbow);
             return (
               <button key={e.key} className={"fx-card" + (active ? " active" : "") + (!running && e.index === fx.effectIndex ? " " : "")} onClick={() => choose(e)}>
                 <span className="name">{name(e)}</span>
                 <span className="bar" style={{ ["--fxbar" as string]: bar }} />
-                {active ? <span className="badge">{t("fx.running")}</span> : e.index >= 40 ? <span className="fx-new">{e.uses.includes("Audio") || e.uses.includes("Beat") ? "♪" : "NEW"}</span> : null}
+                {active ? <span className="badge">{t("fx.running")}</span> : e.uses.includes("Audio") || e.uses.includes("Beat") ? <span className="fx-new">♪</span> : null}
               </button>
             );
           })}
