@@ -43,6 +43,7 @@ class DmxLichtInstance extends InstanceBase {
 
 	async configUpdated(config) {
 		this.config = config
+		this.defineAll() // the connection may have a new name: presets show its variables by that name
 		// forget the old socket first: its onclose must not schedule a second connection
 		const old = this.ws
 		this.ws = null
@@ -322,7 +323,7 @@ class DmxLichtInstance extends InstanceBase {
 		}
 		presets.tap = {
 			type: 'button', category: 'Control', name: 'Tap tempo',
-			style: { text: 'TAP\\n$(dmxlicht:bpm)', size: 'auto', color: BLACK, bgcolor: ACCENT },
+			style: { text: `TAP\\n$(${this.label}:bpm)`, size: 'auto', color: BLACK, bgcolor: ACCENT },
 			steps: [{ down: [{ actionId: 'tap', options: {} }], up: [] }], feedbacks: [],
 		}
 		presets.strobe = {
@@ -344,7 +345,7 @@ class DmxLichtInstance extends InstanceBase {
 		}
 		presets.timeline_go = {
 			type: 'button', category: 'Timeline', name: 'GO / Play',
-			style: { text: 'GO\\n$(dmxlicht:timeline_waiting)', size: 'auto', color: WHITE, bgcolor: GREEN },
+			style: { text: `GO\\n$(${this.label}:timeline_waiting)`, size: 'auto', color: WHITE, bgcolor: GREEN },
 			steps: [{ down: [{ actionId: 'timeline', options: { verb: 'play', name: '' } }], up: [] }],
 			feedbacks: [{ feedbackId: 'timeline_waiting', options: {}, style: { bgcolor: ACCENT, color: BLACK } }],
 		}
@@ -371,7 +372,7 @@ class DmxLichtInstance extends InstanceBase {
 		}
 		presets.output = {
 			type: 'button', category: 'Control', name: 'Output status',
-			style: { text: 'DMX\\n$(dmxlicht:output)', size: '7', color: WHITE, bgcolor: RED },
+			style: { text: `DMX\\n$(${this.label}:output)`, size: '7', color: WHITE, bgcolor: RED },
 			steps: [{ down: [], up: [] }],
 			feedbacks: [{ feedbackId: 'dongle_connected', options: {}, style: { bgcolor: GREEN, color: WHITE } }],
 		}

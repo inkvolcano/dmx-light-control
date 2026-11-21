@@ -1,7 +1,7 @@
 {
   "id": "dmxlicht",
-  "name": "dmxlicht",
-  "shortname": "dmxlicht",
+  "name": "DMX Light Control",
+  "shortname": "dmx_light_control",
   "description": "DMX Light Control - scenes, effects, blackout, flash, tap tempo and timelines",
   "version": "3.0.0",
   "license": "GPL-3.0",

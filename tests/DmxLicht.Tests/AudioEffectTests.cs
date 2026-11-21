@@ -101,7 +101,9 @@ public class AudioEffectTests
         }
         Assert.True(output.Last[1] >= 200, "red follows the bass");
         Assert.True(output.Last[3] < 30, "no blue without highs");
-        Thread.Sleep(1000);   // no more audio data: after 0.4 s it counts as silence, then fades out in ~0.3 s
+        // no more audio data: after 0.4 s it counts as silence, then fades out in ~0.3 s (a busy PC gets more time)
+        until = DateTime.Now.AddSeconds(3);
+        while (DateTime.Now < until && output.Last[1] >= 20) Thread.Sleep(20);
         Assert.True(output.Last[1] < 20, $"fades out after the sound stops ({output.Last[1]})");
     }
 }

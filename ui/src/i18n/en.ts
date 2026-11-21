@@ -476,7 +476,7 @@ export const en: Record<string, string> = {
   "cm.installing": "Installing...",
   "cm.done": "Installed. Start Companion and add the connection 'DMX Light Control'.",
   "cm.doneRestart": "Installed. Restart Companion. A connection 'DMX Light Control' you already had then runs the new module by itself; otherwise add it.",
-  "cm.noActions": "Connection red in Companion, or no actions? In Companion open Connections > dmxlicht, click the pencil next to Module Version, choose 3.0.0 and click Save.",
+  "cm.noActions": "Connection red in Companion, or no actions? In Companion open the DMX Light Control connection under Connections (dmx_light_control, or dmxlicht if it is older), click the pencil next to Module Version, choose 3.0.0 and click Save.",
   "cm.installCompanion": "Install Bitfocus Companion first (bitfocus.io/companion) and start it once; then the module can go in.",
 
   // sound effects
