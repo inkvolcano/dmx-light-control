@@ -691,4 +691,9 @@ De lampen nemen de kleuren over van een beeld, net als ambilight bij een tv.
   "pts.noPicture": "Nog geen beeld. Op deze pc verschijnt hier het scherm of de tv; elders de kleuren zodra scherm volgen loopt.",
   "pts.onlyHere": "Het echte beeld is alleen op de pc zelf te zien; hier zie je de kleuren die de app meet (zodra scherm volgen loopt).",
   "pts.below": "De markers zet je hieronder op het beeld.",
+  "tabs.title": "Tabbladen in het menu",
+  "tabs.hint": "Vink uit wat je niet gebruikt; het verdwijnt uit het menu links. Niets gaat verloren: vink het weer aan en het is terug.",
+  "tabs.help": "Handig om de app eenvoudiger te maken, bijvoorbeeld voor een collega die alleen de bediening en effecten nodig heeft. Dit geldt voor alle apparaten (pc, telefoon, tablet). Instellingen blijft altijd zichtbaar, anders kun je de tabbladen niet meer terugzetten.",
+  "tabs.always": "altijd zichtbaar",
+  "tabs.settingsAlways": "Instellingen blijft altijd in het menu, zodat je tabbladen altijd weer aan kunt zetten",
 };

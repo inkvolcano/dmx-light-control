@@ -23,6 +23,9 @@ public sealed class AppSettings
     public bool Locked { get; set; }
     /// <summary>What the easy (phone) mode shows.</summary>
     public EasySettings Easy { get; set; } = new();
+    /// <summary>Menu tabs that are switched off in Settings ("effects", "screen", ..., "easy" = the Easy button).
+    /// Settings itself is always shown.</summary>
+    public List<string> HiddenPages { get; set; } = new();
     /// <summary>Home Assistant over MQTT.</summary>
     public MqttSettings Mqtt { get; set; } = new();
     /// <summary>Look for a new version on GitHub at start and once a day (installing always needs a click).</summary>

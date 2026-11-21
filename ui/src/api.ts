@@ -184,6 +184,8 @@ export interface AppSettings {
   locked: boolean;
   hasPin?: boolean;
   easy?: EasySettings;
+  /** menu tabs switched off in Settings ("easy" = the Easy button) */
+  hiddenPages?: string[];
   mqtt?: MqttSettings;
   requirePairing?: boolean;
   checkUpdates?: boolean;

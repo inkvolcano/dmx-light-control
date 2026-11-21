@@ -20,20 +20,7 @@ import { PairScreen } from "./pages/PairScreen";
 import { sessionPin } from "./api";
 import { useShow } from "./store";
 
-const pages = [
-  { id: "live", icon: "bulb" },
-  { id: "effects", icon: "sparkles" },
-  { id: "screen", icon: "monitor" },
-  { id: "timeline", icon: "timeline" },
-  { id: "schedule", icon: "clock" },
-  { id: "music", icon: "music" },
-  { id: "faders", icon: "sliders" },
-  { id: "patch", icon: "plug" },
-  { id: "test", icon: "grid" },
-  { id: "integrations", icon: "link" },
-  { id: "settings", icon: "gear" },
-] as const;
-type PageId = (typeof pages)[number]["id"];
+import { isShown, pages, type PageId } from "./pages/pageList";
 
 function savedPage(): PageId {
   try {
@@ -70,6 +57,10 @@ export function App() {
     window.addEventListener("dmx-easy", on);
     return () => window.removeEventListener("dmx-easy", on);
   }, []);
+  const hiddenKey = (full?.settings.hiddenPages ?? []).join(",");
+  useEffect(() => {
+    if (!isShown(page, full?.settings.hiddenPages)) setPage(pages.find((p) => isShown(p.id, full?.settings.hiddenPages))?.id ?? "settings");
+  }, [hiddenKey, page]); // eslint-disable-line react-hooks/exhaustive-deps
   // other parts of the app can open a page (e.g. the effects panel opens the Screen page)
   useEffect(() => {
     const go = (e: Event) => { const p = (e as CustomEvent<string>).detail; if (pages.some((x) => x.id === p)) setPage(p as PageId); };
@@ -125,16 +116,18 @@ export function App() {
     <div className="shell">
       <nav className="sidebar">
         <div className="brand" title="Glowsmith"><div className="brand-dot" /></div>
-        {pages.map((p) => (
+        {pages.filter((p) => isShown(p.id, full?.settings.hiddenPages)).map((p) => (
           <button key={p.id} className={"nav-btn" + (page === p.id ? " active" : "")} onClick={() => setPage(p.id)}>
             <Icon name={p.icon} />
             {t("nav." + p.id)}
           </button>
         ))}
         <div className="spacer" />
-        <button className="nav-btn" onClick={() => setEasy(true)} title={t("easy.switchHint")}>
-          <Icon name="grid" />{t("easy.button")}
-        </button>
+        {isShown("easy", full?.settings.hiddenPages) && (
+          <button className="nav-btn" onClick={() => setEasy(true)} title={t("easy.switchHint")}>
+            <Icon name="grid" />{t("easy.button")}
+          </button>
+        )}
         {/* help stays out of the way: a small ? (or F1) */}
         <button className={"nav-help" + (help ? " active" : "")} onClick={toggleHelp} title={t("help.button") + " (F1)"} aria-label={t("help.button")}>?</button>
         {full?.settings.locked && (

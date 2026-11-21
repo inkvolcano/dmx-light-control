@@ -681,4 +681,9 @@ The lamps take over the colours of a picture, like ambilight on a TV.
   "pts.noPicture": "No picture yet. On this PC the screen or TV shows here; elsewhere the colours once follow-the-screen runs.",
   "pts.onlyHere": "The real picture is only shown on the PC itself; here you see the colours the app measures (once follow-the-screen runs).",
   "pts.below": "You place the markers on the picture below.",
+  "tabs.title": "Tabs in the menu",
+  "tabs.hint": "Untick what you don't use; it disappears from the menu on the left. Nothing is lost: tick it again and it is back.",
+  "tabs.help": "Handy to make the app simpler, for example for a colleague who only needs the controls and effects. This applies to all devices (PC, phone, tablet). Settings always stays visible, otherwise you could not switch the tabs back on.",
+  "tabs.always": "always visible",
+  "tabs.settingsAlways": "Settings always stays in the menu, so you can always switch tabs back on",
 };

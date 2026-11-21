@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { api, type AppSettings } from "../api";
 import { Icon } from "../components/Icon";
+import { Help } from "../components/Help";
 import { OutputCard } from "../components/OutputCard";
 import { OutputsCard } from "../components/OutputsCard";
 import { EasyCard, PhoneCard } from "../components/PhoneCard";
+import { hideable } from "./pageList";
 import { ReportCard } from "../components/ReportCard";
 import { UpdateCard } from "../components/UpdateCard";
 import { ShowsCard } from "../components/ShowsCard";
@@ -67,6 +69,30 @@ export function SettingsPage() {
 
         <PhoneCard settings={s} save={save} />
         <EasyCard settings={s} save={save} openEasy={() => window.dispatchEvent(new Event("dmx-easy"))} />
+        <div className="card stack">
+          <div className="row">
+            <h2 style={{ flex: 1 }}><Icon name="grid" /> {t("tabs.title")}</h2>
+            <Help k="tabs.help" />
+          </div>
+          <p className="hint">{t("tabs.hint")}</p>
+          <div className="tabs-checks">
+            {hideable.map((id) => {
+              const hidden = s.hiddenPages ?? [];
+              const on = !hidden.includes(id);
+              return (
+                <label key={id} className="check">
+                  <input type="checkbox" checked={on}
+                    onChange={(e) => save({ hiddenPages: e.target.checked ? hidden.filter((x) => x !== id) : [...hidden, id] })} />
+                  <span className="box" /> {id === "easy" ? t("easy.button") : t("nav." + id)}
+                </label>
+              );
+            })}
+            <label className="check" title={t("tabs.settingsAlways")}>
+              <input type="checkbox" checked disabled />
+              <span className="box" /> {t("nav.settings")} <span className="hint">({t("tabs.always")})</span>
+            </label>
+          </div>
+        </div>
         <ShowsCard />
         <OutputCard settings={s} save={save} />
         <ReportCard />

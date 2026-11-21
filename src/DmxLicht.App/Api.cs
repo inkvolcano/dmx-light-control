@@ -738,6 +738,7 @@ static class Api
                 settings.Locked = s.Settings.Locked;
                 settings.Devices = s.Settings.Devices;   // managed by the pairing endpoints only
                 settings.Mqtt ??= s.Settings.Mqtt ?? new MqttSettings();
+                settings.HiddenPages = (settings.HiddenPages ?? new()).Where(p => !string.IsNullOrWhiteSpace(p) && p != "settings").Distinct().Take(50).ToList();
                 if (settings.Mqtt.Password == null) settings.Mqtt.Password = s.Settings.Mqtt?.Password;   // UI never has it
                 return 0;
             });
