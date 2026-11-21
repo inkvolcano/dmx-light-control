@@ -57,13 +57,20 @@ if (-not $exists) {
 
 # 4. release with the zip and its checksum (auto-update downloads these)
 if ($Release) {
-    $z = "publish\DmxLicht-$version.zip"; $s = "$z.sha256"
+    $z = "publish\DMX-Light-Control-$version.zip"; $s = "$z.sha256"
     if (-not (Test-Path $z) -or -not (Test-Path $s)) { throw "Run Bouwen.bat first: $z and $s are needed." }
     if (-not $Notes) { $Notes = "DMX Light Control $version" }
     # the notes go through a file: quotes in them can never break the command line
     $nf = Join-Path $env:TEMP "dlc-release-notes.md"
     [IO.File]::WriteAllText($nf, $Notes, (New-Object Text.UTF8Encoding $false))
-    gh release create "v$version" $z $s --repo $Repo --title "DMX Light Control $version" --notes-file $nf --target main
-    Remove-Item $nf -ErrorAction SilentlyContinue
+    # installs up to 2.1.16 only look for DmxLicht-<version>.zip: the same zip under that name too, labelled so
+    # nobody downloads it by hand (the label is what the release page shows)
+    $old = Join-Path $env:TEMP "DmxLicht-$version.zip"; $oldS = "$old.sha256"
+    Copy-Item $z $old -Force
+    $h = (Get-FileHash $old -Algorithm SHA256).Hash.ToLower()
+    [IO.File]::WriteAllText($oldS, "$h  DmxLicht-$version.zip`n")
+    gh release create "v$version" $z $s "$old#Auto-update for 2.1.16 and older (zip)" "$oldS#Auto-update for 2.1.16 and older (checksum)" `
+        --repo $Repo --title "DMX Light Control $version" --notes-file $nf --target main
+    Remove-Item $nf, $old, $oldS -ErrorAction SilentlyContinue
 }
 Write-Host "Done: https://github.com/$Repo"

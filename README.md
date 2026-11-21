@@ -4,10 +4,10 @@ DMX lighting control for Windows: a portable app (nothing to install) with a web
 dongle, Art-Net or sACN. Interface in Dutch and English.
 
 DMX Light Control was called **DmxLicht** until version 2.1.7 and **Glowsmith** until 2.1.14. Only the name you see
-changed: the program file is still `DmxLicht.exe`, releases are still `DmxLicht-<version>.zip`, and the code keeps the
+changed: the program file is still `DmxLicht.exe`, releases are `DMX-Light-Control-<version>.zip` since 2.1.17 (`DmxLicht-<version>.zip` before), and the code keeps the
 `DmxLicht.*` project names, so existing installs, shows and the Companion connection carry on as before.
 
-**Download:** the latest `DmxLicht-<version>.zip` from [Releases](https://github.com/inkvolcano/dmx-light-control/releases).
+**Download:** the latest `DMX-Light-Control-<version>.zip` from [Releases](https://github.com/inkvolcano/dmx-light-control/releases).
 Unzip anywhere and start `DmxLicht.exe` (Windows 10/11, x64). The app updates itself from Releases (Settings > Updates).
 
 DMX Light Control grew from a colleague's single-file WinForms app *DMX Lichtbesturing v1.4*. The DMX output for v1.4's
@@ -82,7 +82,7 @@ report) when something goes wrong.
 Needs the .NET 9 SDK and Node.js to **build**. The result needs nothing installed.
 
 ```powershell
-.\Bouwen.bat          # UI + tests + self-contained publish + Companion module -> publish\DmxLicht-<version>.zip
+.\Bouwen.bat          # UI + tests + self-contained publish + Companion module -> publish\DMX-Light-Control-<version>.zip
 dotnet test
 ```
 
@@ -114,7 +114,7 @@ On first start next to an old v1.4 `Instellingen` folder, its ini and custom col
 
 ## Releasing
 
-1. `.\Bouwen.bat` raises `version.txt`, builds `publish\DmxLicht-<version>.zip` and its `.sha256`.
+1. `.\Bouwen.bat` raises `version.txt`, builds `publish\DMX-Light-Control-<version>.zip` and its `.sha256`.
 2. Commit, then `powershell -ExecutionPolicy Bypass -File tools\Publish-Public.ps1 -Release -Notes "what's new"`:
    copies HEAD (without the private files) to github.com/inkvolcano/dmx-light-control with a noreply author and
    creates release `v<version>` with the zip and checksum. Running apps offer the update within a day.

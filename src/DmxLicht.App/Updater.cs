@@ -9,13 +9,15 @@ namespace DmxLicht.App;
 
 /// <summary>
 /// Updates from GitHub Releases (github.com/inkvolcano/dmx-light-control): checks the latest release, downloads
-/// DmxLicht-&lt;version&gt;.zip, checks it against the release's .sha256 file, unpacks it next to the app and lets a
+/// DMX-Light-Control-&lt;version&gt;.zip, checks it against the release's .sha256 file, unpacks it next to the app and lets a
 /// small script swap the files after the app has closed, then starts the new version. The Instellingen folder
 /// (show, settings, songs) is never touched.
 /// </summary>
 static class Updater
 {
     public const string Repo = "inkvolcano/dmx-light-control";
+    /// <summary>Release zip names, newest first: DMX-Light-Control-&lt;version&gt;.zip since 2.1.17, DmxLicht-&lt;version&gt;.zip before.</summary>
+    static readonly string[] ZipPrefixes = { "DMX-Light-Control-", "DmxLicht-" };
     static readonly HttpClient http = CreateClient();
 
     public sealed record Release(string Version, string Notes, string Url, string ZipUrl, string ShaUrl, DateTime? Published);
@@ -49,8 +51,9 @@ static class Updater
         {
             string dir = Path.Combine(Log.Dir, "Updates");
             if (Directory.Exists(dir))
-                foreach (string f in Directory.GetFiles(dir, "DmxLicht-*.zip"))
-                    if (!IsNewer(Path.GetFileNameWithoutExtension(f).Replace("DmxLicht-", ""), Log.AppVersion)) File.Delete(f);
+                foreach (string prefix in ZipPrefixes)
+                    foreach (string f in Directory.GetFiles(dir, prefix + "*.zip"))
+                        if (!IsNewer(Path.GetFileNameWithoutExtension(f)[prefix.Length..], Log.AppVersion)) File.Delete(f);
         }
         catch { }
     }
@@ -66,13 +69,15 @@ static class Updater
             using JsonDocument doc = JsonDocument.Parse(await r.Content.ReadAsStringAsync());
             JsonElement j = doc.RootElement;
             string version = Clean(j.GetProperty("tag_name").GetString());
+            var assets = j.GetProperty("assets").EnumerateArray()
+                .Select(a => (name: a.GetProperty("name").GetString() ?? "", url: a.GetProperty("browser_download_url").GetString())).ToList();
+            // the first name with both the zip and its checksum: the current name, else the old one
             string zip = null, sha = null;
-            foreach (JsonElement a in j.GetProperty("assets").EnumerateArray())
+            foreach (string prefix in ZipPrefixes)
             {
-                string name = a.GetProperty("name").GetString() ?? "";
-                string url = a.GetProperty("browser_download_url").GetString();
-                if (name.Equals($"DmxLicht-{version}.zip", StringComparison.OrdinalIgnoreCase)) zip = url;
-                else if (name.Equals($"DmxLicht-{version}.zip.sha256", StringComparison.OrdinalIgnoreCase)) sha = url;
+                string z = assets.FirstOrDefault(a => a.name.Equals($"{prefix}{version}.zip", StringComparison.OrdinalIgnoreCase)).url;
+                string s = assets.FirstOrDefault(a => a.name.Equals($"{prefix}{version}.zip.sha256", StringComparison.OrdinalIgnoreCase)).url;
+                if (z != null && s != null) { zip = z; sha = s; break; }
             }
             Latest = new Release(version, j.TryGetProperty("body", out var b) ? b.GetString() : "", j.GetProperty("html_url").GetString(), zip, sha,
                 j.TryGetProperty("published_at", out var p) && p.ValueKind == JsonValueKind.String ? p.GetDateTime() : null);
@@ -101,7 +106,7 @@ static class Updater
 
             string dir = Path.Combine(Log.Dir, "Updates");
             Directory.CreateDirectory(dir);
-            string zipPath = Path.Combine(dir, $"DmxLicht-{rel.Version}.zip");
+            string zipPath = Path.Combine(dir, $"{ZipPrefixes[0]}{rel.Version}.zip");
             string expected = (await http.GetStringAsync(rel.ShaUrl)).Trim().Split(' ', '\t', '\r', '\n')[0].ToLowerInvariant();
 
             using (HttpResponseMessage r = await http.GetAsync(rel.ZipUrl, HttpCompletionOption.ResponseHeadersRead))

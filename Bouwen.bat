@@ -1,5 +1,5 @@
 @echo off
-rem Maakt publish\DmxLicht-<versie>.zip (om te delen) en werkt de map publish\DmxLicht-<versie> bij.
+rem Maakt publish\DMX-Light-Control-<versie>.zip (om te delen) en werkt de map publish\DmxLicht-<versie> bij.
 rem Die map werkt op elke Windows 10/11 pc zonder iets te installeren (.NET zit erin).
 rem Nodig om te BOUWEN (niet om te gebruiken): .NET 9 SDK en Node.js.
 rem
@@ -52,9 +52,9 @@ robocopy companion-module\node_modules %CM%\node_modules /E /NFL /NDL /NJH /NJS 
 if errorlevel 8 goto fail
 
 echo [5/5] Zip maken...
-powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\*' -DestinationPath 'publish\DmxLicht-%VERSION%.zip' -Force" || goto fail
+powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\*' -DestinationPath 'publish\DMX-Light-Control-%VERSION%.zip' -Force" || goto fail
 rem controlegetal: de app controleert hiermee een download bij automatisch bijwerken
-powershell -NoProfile -Command "$h=(Get-FileHash 'publish\DmxLicht-%VERSION%.zip' -Algorithm SHA256).Hash.ToLower(); [IO.File]::WriteAllText('publish\DmxLicht-%VERSION%.zip.sha256', $h + '  DmxLicht-%VERSION%.zip' + [Environment]::NewLine)" || goto fail
+powershell -NoProfile -Command "$h=(Get-FileHash 'publish\DMX-Light-Control-%VERSION%.zip' -Algorithm SHA256).Hash.ToLower(); [IO.File]::WriteAllText('publish\DMX-Light-Control-%VERSION%.zip.sha256', $h + '  DMX-Light-Control-%VERSION%.zip' + [Environment]::NewLine)" || goto fail
 
 rem Map bijwerken. Een map hernoemen lukt niet als er een programma uit draait: zo weten we het
 rem zeker voordat er iets weg gaat.
@@ -83,7 +83,7 @@ if exist %OUT%-oud rmdir /s /q %OUT%-oud
 rem gelukt: dit nummer bewaren (ook in de interface en de Companion-module)
 powershell -NoProfile -Command "[IO.File]::WriteAllText('version.txt', '%VERSION%' + [Environment]::NewLine); foreach ($f in 'ui\package.json','companion-module\package.json','companion-module\companion\manifest.json') { $j=Get-Content $f -Raw; $j=$j -replace '\"version\": \"[0-9.]+\"', '\"version\": \"%VERSION%\"'; [IO.File]::WriteAllText((Resolve-Path $f), $j) }"
 echo.
-echo Klaar: publish\DmxLicht-%VERSION%.zip
+echo Klaar: publish\DMX-Light-Control-%VERSION%.zip
 echo Uitpakken op de andere pc en DmxLicht.exe starten.
 exit /b 0
 

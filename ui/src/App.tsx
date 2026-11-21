@@ -67,13 +67,10 @@ export function App() {
     window.addEventListener("dmx-goto", go);
     return () => window.removeEventListener("dmx-goto", go);
   }, []);
-  // help: F1 or the button; the first time the app opens, the quick start shows by itself
-  const [help, setHelp] = useState<null | "page" | "start">(() => {
-    try { return localStorage.getItem("helpSeen") ? null : "start"; } catch { return null; }
-  });
-  const markSeen = () => { try { localStorage.setItem("helpSeen", "1"); } catch { /* ignore */ } };
-  const closeHelp = () => { setHelp(null); markSeen(); };
-  const toggleHelp = () => setHelp((h) => { if (h) markSeen(); return h ? null : "page"; });
+  // help: only on request (F1 or the ? button), never by itself
+  const [help, setHelp] = useState<null | "page" | "start">(null);
+  const closeHelp = () => setHelp(null);
+  const toggleHelp = () => setHelp((h) => (h ? null : "page"));
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === "F1") { e.preventDefault(); toggleHelp(); } };
     window.addEventListener("keydown", key);
