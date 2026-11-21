@@ -88,7 +88,7 @@ sealed class ScreenSampler : IDisposable
                 {
                     Screen[] screens = Screen.AllScreens;
                     Rectangle r = (set.Monitor >= 0 && set.Monitor < screens.Length ? screens[set.Monitor] : Screen.PrimaryScreen!).Bounds;
-                    Grab(r, bits);
+                    Grab(r, bits, W, H);
                     Publish(ToGrid(bits), set.Smoothing);
                 }
                 if (lastError != null) { lastError = null; Log.Write("Scherm volgen werkt weer"); }
@@ -101,7 +101,7 @@ sealed class ScreenSampler : IDisposable
         }
     }
 
-    static void Grab(Rectangle r, byte[] bits)
+    static void Grab(Rectangle r, byte[] bits, int W, int H)
     {
         IntPtr screen = GetDC(IntPtr.Zero);
         IntPtr mem = CreateCompatibleDC(screen);
@@ -115,7 +115,7 @@ sealed class ScreenSampler : IDisposable
                 throw new InvalidOperationException("scherm kopiëren mislukt (code " + Marshal.GetLastWin32Error() + ")");
             var info = new BITMAPINFO { biSize = 40, biWidth = W, biHeight = -H, biPlanes = 1, biBitCount = 32 };
             SelectObject(mem, old);
-            if (GetDIBits(mem, bmp, 0, H, bits, ref info, 0) == 0) throw new InvalidOperationException("schermpixels lezen mislukt");
+            if (GetDIBits(mem, bmp, 0, (uint)H, bits, ref info, 0) == 0) throw new InvalidOperationException("schermpixels lezen mislukt");
         }
         finally
         {
@@ -124,6 +124,48 @@ sealed class ScreenSampler : IDisposable
             DeleteDC(mem);
             ReleaseDC(IntPtr.Zero, screen);
         }
+    }
+
+    /// <summary>
+    /// A small picture (JPEG) of what screen sync sees: the chosen monitor, or the camera's framed TV straightened.
+    /// For placing the lamp markers. Null when there is no camera picture yet.
+    /// </summary>
+    public byte[] Snapshot(ScreenSyncSettings set, int w = 320, int h = 180)
+    {
+        ScreenGrid g;
+        if (set.Source == ScreenSource.Camera)
+        {
+            if (camera.Decode() is not { } f) return null;
+            g = CameraFrame.Grid(f.Pixels, f.Width, f.Height, f.Stride, 3, set.Corners, w, h);
+        }
+        else
+        {
+            Screen[] screens = Screen.AllScreens;
+            Rectangle r = (set.Monitor >= 0 && set.Monitor < screens.Length ? screens[set.Monitor] : Screen.PrimaryScreen!).Bounds;
+            var bits = new byte[w * h * 4];
+            Grab(r, bits, w, h);
+            var cells = new Color[w * h];
+            for (int k = 0; k < w * h; k++) cells[k] = Color.FromArgb(bits[k * 4 + 2], bits[k * 4 + 1], bits[k * 4]);
+            g = new ScreenGrid(cells, w, h);
+        }
+        using var bmp = new Bitmap(g.Width, g.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        var data = bmp.LockBits(new Rectangle(0, 0, g.Width, g.Height), System.Drawing.Imaging.ImageLockMode.WriteOnly, bmp.PixelFormat);
+        try
+        {
+            var row = new byte[data.Stride];
+            for (int y = 0; y < g.Height; y++)
+            {
+                for (int x = 0; x < g.Width; x++) { Color c = g[x, y]; row[x * 3] = c.B; row[x * 3 + 1] = c.G; row[x * 3 + 2] = c.R; }
+                Marshal.Copy(row, 0, data.Scan0 + y * data.Stride, data.Stride);
+            }
+        }
+        finally { bmp.UnlockBits(data); }
+        using var ms = new MemoryStream();
+        var codec = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+        using var p = new System.Drawing.Imaging.EncoderParameters(1);
+        p.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 75L);
+        bmp.Save(ms, codec, p);
+        return ms.ToArray();
     }
 
     /// <summary>The shrunk screen (BGRA) as a grid of colours.</summary>

@@ -650,4 +650,45 @@ Laat het licht vanzelf iets doen op vaste momenten.
   "upd.confirm": "Bijwerken naar versie {v}? De app sluit even en start daarna opnieuw; het licht staat een paar seconden stil.",
   "upd.chip": "Update {v}",
   "upd.chipHint": "Er is een nieuwe versie: klik om naar Instellingen te gaan",
+  "nav.screen": "Scherm",
+  "ss.openPage": "Instellen op de pagina Scherm",
+  "ss.start": "Scherm volgen starten",
+  "ss.lampsNow": "Wat de lampen nu doen",
+  "ss.isOn": "volgt het scherm",
+  "ss.isOff": "staat uit",
+  "ss.cardSource": "Beeld",
+  "ss.cardCamera": "Camera, kader en keystone",
+  "ss.cardSpread": "Verdeling over de lampen",
+  "ss.pageHelp": "Hier laat je de lampen de kleuren van een scherm volgen: het scherm van deze pc, of een tv via een webcam. Links kies je de bron (en bij een camera het kader rond de tv, met keystone), rechts hoe de kleuren over de lampen gaan. Starten en stoppen kan hier of bij Effecten > Scherm volgen.",
+  "help.page.screen": `# Scherm (ambilight)
+De lampen nemen de kleuren over van een beeld, net als ambilight bij een tv.
+
+# Bron
+- Dit pc-scherm: wat er op het scherm van deze pc staat (film, presentatie, visuals). Heb je meer schermen, kies er een.
+- Camera op een tv: een webcam kijkt naar een tv of beamerscherm. Zo werkt het ook met een tv-kastje, streaming-app of spelcomputer.
+
+# Kader en keystone (alleen bij camera)
+1. Zet de webcam stevig neer met de hele tv in beeld.
+2. Klik op "Tv automatisch zoeken" (zet de tv aan, met een licht beeld), of sleep de bolletjes 1-4 op de hoeken van de tv.
+3. Fijn afstellen: kies een hoek en verschuif met de pijltjestoetsen, of gebruik de keystone-knoppen (verticaal, horizontaal, draaien, grootte), net als bij een beamer.
+4. Het raster laat zien hoe de app het beeld rechttrekt.
+
+# Verdeling
+- Kolommen: links van het beeld naar links in de rij lampen, enz.
+- Gemiddelde: alle lampen dezelfde kleur.
+- Randen: lampen rondom de tv; zie het voorbeeld met nummers.
+- Markers: je zet per lamp zelf een bolletje op het beeld; die lamp pakt de kleur van precies die plek.
+- Rustiger maakt snelle wisselingen zachter; kleurversterking maakt bleke beelden feller.`,
+  "pts.mode": "Markers",
+  "pts.title": "Markers: waar elke lamp zijn kleur vandaan haalt",
+  "pts.hint": "Elk genummerd bolletje is een lamp ({n} in totaal, in de volgorde van de pagina Lampen). Sleep het naar de plek op het beeld waar die lamp zijn kleur moet pakken; het vierkantje is het gebied dat gemeten wordt. Het bolletje kleurt mee met wat de lamp nu doet.",
+  "pts.dragHint": "Sleep een bolletje, of klik er een aan en klik dan op het beeld om hem daarheen te zetten.",
+  "pts.selectedHint": "Lamp {n} gekozen: klik op het beeld om hem te verplaatsen, of gebruik de pijltjestoetsen (Shift = grotere stappen). Esc = loslaten.",
+  "pts.lamp": "Lamp {n}",
+  "pts.size": "Meetvlak: {n}% van de breedte",
+  "pts.reset": "Op een rij",
+  "pts.around": "Rondom het beeld",
+  "pts.noPicture": "Nog geen beeld. Op deze pc verschijnt hier het scherm of de tv; elders de kleuren zodra scherm volgen loopt.",
+  "pts.onlyHere": "Het echte beeld is alleen op de pc zelf te zien; hier zie je de kleuren die de app meet (zodra scherm volgen loopt).",
+  "pts.below": "De markers zet je hieronder op het beeld.",
 };

@@ -800,6 +800,10 @@ static class Api
             set.EdgeRight = Math.Clamp(set.EdgeRight, 0, 128); set.EdgeBottom = Math.Clamp(set.EdgeBottom, 0, 128);
             if (set.Corners is not { Length: 8 }) set.Corners = ScreenSyncSettings.DefaultCorners();
             for (int i = 0; i < 8; i++) set.Corners[i] = Math.Clamp(double.IsFinite(set.Corners[i]) ? set.Corners[i] : 0.5, 0, 1);
+            set.PointSize = Math.Clamp(set.PointSize, 1, 50);
+            if (set.Points != null)
+                set.Points = set.Points.Take(Math.Min(2 * EffectLibrary.MaxHeads, set.Points.Length / 2 * 2))
+                    .Select(v => Math.Clamp(double.IsFinite(v) ? v : 0.5, 0, 1)).ToArray();
             engine.Change(s => s.State.ScreenSync = set, undoable: false);
             return Results.Ok();
         });
@@ -819,6 +823,25 @@ static class Api
             {
                 byte[] jpg = Program.Screen?.Camera.Jpeg();
                 if (jpg != null) return Results.File(jpg, "image/jpeg");
+                await Task.Delay(100);
+            }
+            return Results.Text(CameraCapture.Error ?? "geen beeld", statusCode: 503);
+        });
+        // what screen sync sees (monitor or straightened TV), for placing the lamp markers; stays on this PC
+        api.MapGet("/screen/snapshot", async (HttpContext ctx) =>
+        {
+            if (ctx.Connection.RemoteIpAddress is not { } ip || !System.Net.IPAddress.IsLoopback(ip))
+                return Results.Text("screen picture only on this PC", statusCode: 403);
+            ScreenSyncSettings set = engine.Read(s => s.State.ScreenSync) ?? new ScreenSyncSettings();
+            if (set.Source == ScreenSource.Camera) ScreenSampler.WantPreview();
+            for (int i = 0; i < 30; i++)
+            {
+                try
+                {
+                    byte[] jpg = Program.Screen?.Snapshot(set);
+                    if (jpg != null) { ctx.Response.Headers.CacheControl = "no-store"; return Results.File(jpg, "image/jpeg"); }
+                }
+                catch (Exception ex) { return Results.Text(ex.Message, statusCode: 503); }
                 await Task.Delay(100);
             }
             return Results.Text(CameraCapture.Error ?? "geen beeld", statusCode: 503);

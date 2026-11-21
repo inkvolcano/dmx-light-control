@@ -640,4 +640,45 @@ Let the light do things by itself at set moments.
   "upd.confirm": "Update to version {v}? The app closes briefly and restarts; the light pauses for a few seconds.",
   "upd.chip": "Update {v}",
   "upd.chipHint": "A new version is out: click to go to Settings",
+  "nav.screen": "Screen",
+  "ss.openPage": "Set up on the Screen page",
+  "ss.start": "Start following the screen",
+  "ss.lampsNow": "What the lamps do now",
+  "ss.isOn": "following the screen",
+  "ss.isOff": "off",
+  "ss.cardSource": "Picture",
+  "ss.cardCamera": "Camera, frame and keystone",
+  "ss.cardSpread": "Spread over the lamps",
+  "ss.pageHelp": "Here the lamps follow the colours of a screen: this PC's screen, or a TV through a webcam. On the left you pick the source (and for a camera the frame around the TV, with keystone correction), on the right how the colours go over the lamps. Start and stop here or at Effects > Follow the screen.",
+  "help.page.screen": `# Screen (ambilight)
+The lamps take over the colours of a picture, like ambilight on a TV.
+
+# Source
+- This PC's screen: what is on this PC's screen (film, presentation, visuals). With more screens, pick one.
+- Camera on a TV: a webcam looks at a TV or projector screen. This also works with a TV box, streaming app or game console.
+
+# Frame and keystone (camera only)
+1. Put the webcam down firmly with the whole TV in view.
+2. Click "Find TV automatically" (TV on, with a bright picture), or drag dots 1-4 onto the TV's corners.
+3. Fine-tune: pick a corner and nudge it with the arrow keys, or use the keystone buttons (vertical, horizontal, rotate, size), like on a projector.
+4. The grid shows how the app straightens the picture.
+
+# Spread
+- Columns: the left of the picture goes to the left of the row of lamps, and so on.
+- Average: all lamps the same colour.
+- Edges: lamps around the TV; see the numbered preview.
+- Markers: you put a dot on the picture for each lamp; that lamp takes the colour of exactly that spot.
+- Calmer softens fast changes; colour boost makes pale pictures brighter.`,
+  "pts.mode": "Markers",
+  "pts.title": "Markers: where each lamp takes its colour",
+  "pts.hint": "Each numbered dot is a lamp ({n} in total, in the order of the Lamps page). Drag it to the spot on the picture where that lamp should take its colour; the small square is the area that is measured. The dot shows what the lamp does now.",
+  "pts.dragHint": "Drag a dot, or click one and then click on the picture to move it there.",
+  "pts.selectedHint": "Lamp {n} selected: click on the picture to move it, or use the arrow keys (Shift = bigger steps). Esc = let go.",
+  "pts.lamp": "Lamp {n}",
+  "pts.size": "Measured area: {n}% of the width",
+  "pts.reset": "In a row",
+  "pts.around": "Around the picture",
+  "pts.noPicture": "No picture yet. On this PC the screen or TV shows here; elsewhere the colours once follow-the-screen runs.",
+  "pts.onlyHere": "The real picture is only shown on the PC itself; here you see the colours the app measures (once follow-the-screen runs).",
+  "pts.below": "You place the markers on the picture below.",
 };

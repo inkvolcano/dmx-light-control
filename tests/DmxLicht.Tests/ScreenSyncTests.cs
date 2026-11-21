@@ -245,4 +245,40 @@ public class ScreenSyncTests
         Assert.StartsWith("unknown colour", Commands.Validate(e, "color plaid"));
         Assert.StartsWith("timeline not found", Commands.Validate(e, "timeline play Show"));
     }
+    [Fact]
+    public void MarkersTakeTheColourOfTheirOwnSpot()
+    {
+        ScreenGrid tv = Tv();
+        // lamp 0 on the left edge (red), lamp 1 at the top (green), lamp 2 on the right (blue), lamp 3 at the bottom (yellow)
+        var set = new ScreenSyncSettings
+        {
+            Mode = ScreenSyncMode.Points, FollowBrightness = false, Saturation = 100, PointSize = 4,
+            Points = new[] { 0.02, 0.5, 0.5, 0.04, 0.98, 0.5, 0.5, 0.96 },
+        };
+        LampOutput[] o = ScreenFeed.Render(set, false, 4, tv);
+        Assert.Equal("R", Hue(o[0]));
+        Assert.Equal("G", Hue(o[1]));
+        Assert.Equal("B", Hue(o[2]));
+        Assert.Equal("Y", Hue(o[3]));
+
+        // moving a marker moves where the lamp looks
+        set.Points = new[] { 0.98, 0.5 };
+        Assert.Equal("B", Hue(ScreenFeed.Render(set, false, 1, tv)[0]));
+    }
+
+    [Fact]
+    public void LampsWithoutMarkerGetASpotOnARow()
+    {
+        var set = new ScreenSyncSettings { Mode = ScreenSyncMode.Points, Points = new[] { 0.1, 0.2 } };
+        Assert.Equal((0.1, 0.2), ScreenFeed.PointOf(set, 0, 3));
+        Assert.Equal((0.5, 0.5), ScreenFeed.PointOf(set, 1, 3));        // no marker: middle of its share of the row
+        Assert.Equal((2.5 / 3, 0.5), ScreenFeed.PointOf(set, 2, 3));
+        // broken values never crash and stay on the picture
+        set.Points = new[] { double.NaN, 7.0, -3, 0.5 };
+        Assert.Equal((0.5 / 2, 0.5), ScreenFeed.PointOf(set, 0, 2));
+        Assert.Equal((0.0, 0.5), ScreenFeed.PointOf(set, 1, 2));
+        var (x0, x1, y0, y1) = ScreenFeed.PointArea(Tv(), new ScreenSyncSettings { PointSize = 1 }, 1.0, 1.0);
+        Assert.True(x1 - x0 >= 1 && y1 - y0 >= 1 && x1 <= 32 && y1 <= 18);
+        Assert.Equal(5, ScreenFeed.Render(set, true, 5, Tv()).Length);
+    }
 }

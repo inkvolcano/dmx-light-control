@@ -11,6 +11,8 @@ public enum ScreenSyncMode
     Average,
     /// <summary>Real ambilight: lamps around the TV take the colour of the nearest edge of the picture.</summary>
     Edges,
+    /// <summary>Markers: every lamp takes the colour of its own spot on the picture (placed by the user).</summary>
+    Points,
 }
 
 /// <summary>Where the colours come from.</summary>
@@ -63,6 +65,13 @@ public sealed class ScreenSyncSettings
     public bool EdgeReverse { get; set; }
     /// <summary>Which lamp is the first one of the chain (rotates the order).</summary>
     public int EdgeStart { get; set; }
+
+    // ---- markers ----
+    /// <summary>Per lamp (in lamp order) the spot it takes its colour from: x, y pairs, 0..1 over the picture.
+    /// Lamps without a spot get one on a row through the middle.</summary>
+    public double[] Points { get; set; }
+    /// <summary>Size of the measured square around each spot, in % of the picture's width.</summary>
+    public int PointSize { get; set; } = 8;
 }
 
 /// <summary>A picture shrunk to a small grid of colours (top row first).</summary>
@@ -127,6 +136,7 @@ public static class ScreenFeed
         {
             ScreenSyncMode.Average => Enumerable.Repeat(Average(g, 0, g.Width, 0, g.Height), n).ToArray(),
             ScreenSyncMode.Edges => EdgeColors(g, set, n),
+            ScreenSyncMode.Points => PointColors(g, set, n),
             _ => ZoneColors(g, set, n),
         };
         for (int i = 0; i < n; i++)
@@ -148,6 +158,39 @@ public static class ScreenFeed
             int lamp = set.Mirror ? n - 1 - i : i;
             int a = x0 + lamp * w / n, b = Math.Max(a + 1, x0 + (lamp + 1) * w / n);
             c[i] = Average(g, a, b, y0, y1);
+        }
+        return c;
+    }
+
+    /// <summary>Where lamp <paramref name="i"/> of <paramref name="n"/> measures: its marker, or a spot on a row through the middle.</summary>
+    public static (double X, double Y) PointOf(ScreenSyncSettings set, int i, int n)
+    {
+        double[] p = set.Points;
+        if (p != null && 2 * i + 1 < p.Length && double.IsFinite(p[2 * i]) && double.IsFinite(p[2 * i + 1]))
+            return (Math.Clamp(p[2 * i], 0, 1), Math.Clamp(p[2 * i + 1], 0, 1));
+        return ((i + 0.5) / Math.Max(1, n), 0.5);
+    }
+
+    /// <summary>The measured square around a marker, in grid cells (at least one cell; square on a 16:9 picture).</summary>
+    public static (int X0, int X1, int Y0, int Y1) PointArea(ScreenGrid g, ScreenSyncSettings set, double x, double y)
+    {
+        double hx = Math.Clamp(set.PointSize, 1, 50) / 200.0;   // half the width, as a fraction of the picture
+        double hy = hx * 16.0 / 9.0;
+        int x0 = (int)Math.Floor((x - hx) * g.Width), x1 = (int)Math.Ceiling((x + hx) * g.Width);
+        int y0 = (int)Math.Floor((y - hy) * g.Height), y1 = (int)Math.Ceiling((y + hy) * g.Height);
+        x0 = Math.Clamp(x0, 0, g.Width - 1); x1 = Math.Clamp(x1, x0 + 1, g.Width);
+        y0 = Math.Clamp(y0, 0, g.Height - 1); y1 = Math.Clamp(y1, y0 + 1, g.Height);
+        return (x0, x1, y0, y1);
+    }
+
+    static Color[] PointColors(ScreenGrid g, ScreenSyncSettings set, int n)
+    {
+        var c = new Color[n];
+        for (int i = 0; i < n; i++)
+        {
+            var (x, y) = PointOf(set, i, n);
+            var (x0, x1, y0, y1) = PointArea(g, set, x, y);
+            c[i] = Average(g, x0, x1, y0, y1);
         }
         return c;
     }

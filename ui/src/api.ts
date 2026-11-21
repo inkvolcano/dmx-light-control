@@ -120,10 +120,12 @@ export interface ShowState {
 }
 
 export interface ScreenSyncSettings {
-  mode: "zones" | "average" | "edges"; monitor: number; saturation: number; smoothing: number; followBrightness: boolean; mirror: boolean;
+  mode: "zones" | "average" | "edges" | "points"; monitor: number; saturation: number; smoothing: number; followBrightness: boolean; mirror: boolean;
   source?: "screen" | "camera"; camera?: string | null; corners?: number[];
   edgeAuto?: boolean; edgeLeft?: number; edgeTop?: number; edgeRight?: number; edgeBottom?: number;
   edgeDepth?: number; skipBlackBars?: boolean; edgeReverse?: boolean; edgeStart?: number;
+  /** markers: x, y per lamp (0..1 over the picture) and the measured square in % of the width */
+  points?: number[] | null; pointSize?: number;
 }
 export type ScheduleTimeKind = "time" | "sunrise" | "sunset";
 export interface ScheduleItem { id: string; name: string; enabled: boolean; days: number[]; date: string | null; kind: ScheduleTimeKind; time: string; offsetMinutes: number; command: string; fadeSeconds?: number }

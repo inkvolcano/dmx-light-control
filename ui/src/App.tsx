@@ -4,6 +4,7 @@ import { Icon } from "./components/Icon";
 import { TopBar } from "./components/TopBar";
 import { useT } from "./i18n";
 import { EffectsPage } from "./pages/EffectsPage";
+import { ScreenPage } from "./pages/ScreenPage";
 import { FadersPage } from "./pages/FadersPage";
 import { LivePage } from "./pages/LivePage";
 import { MusicPage } from "./pages/MusicPage";
@@ -22,6 +23,7 @@ import { useShow } from "./store";
 const pages = [
   { id: "live", icon: "bulb" },
   { id: "effects", icon: "sparkles" },
+  { id: "screen", icon: "monitor" },
   { id: "timeline", icon: "timeline" },
   { id: "schedule", icon: "clock" },
   { id: "music", icon: "music" },
@@ -67,6 +69,12 @@ export function App() {
     const on = () => setEasy(true);
     window.addEventListener("dmx-easy", on);
     return () => window.removeEventListener("dmx-easy", on);
+  }, []);
+  // other parts of the app can open a page (e.g. the effects panel opens the Screen page)
+  useEffect(() => {
+    const go = (e: Event) => { const p = (e as CustomEvent<string>).detail; if (pages.some((x) => x.id === p)) setPage(p as PageId); };
+    window.addEventListener("dmx-goto", go);
+    return () => window.removeEventListener("dmx-goto", go);
   }, []);
   // help: F1 or the button; the first time the app opens, the quick start shows by itself
   const [help, setHelp] = useState<null | "page" | "start">(() => {
@@ -139,6 +147,7 @@ export function App() {
           <>
             {page === "live" && <LivePage selected={selected} setSelected={setSelected} goPatch={() => setPage("patch")} />}
             {page === "effects" && <EffectsPage />}
+            {page === "screen" && <ScreenPage />}
             {page === "music" && <MusicPage />}
             {page === "timeline" && <TimelinePage />}
             {page === "schedule" && <SchedulePage />}
