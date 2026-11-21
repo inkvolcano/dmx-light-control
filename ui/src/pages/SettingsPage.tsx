@@ -10,7 +10,7 @@ import { ReportCard } from "../components/ReportCard";
 import { UpdateCard } from "../components/UpdateCard";
 import { ShowsCard } from "../components/ShowsCard";
 import { languages, useT } from "../i18n";
-import { reloadBootstrap, updateSettings, useShow } from "../store";
+import { currentSettings, reloadBootstrap, updateSettings, useShow } from "../store";
 
 function LockCard({ hasPin, locked }: { hasPin: boolean; locked: boolean }) {
   const t = useT();
@@ -82,7 +82,10 @@ export function SettingsPage() {
               return (
                 <label key={id} className="check">
                   <input type="checkbox" checked={on}
-                    onChange={(e) => save({ hiddenPages: e.target.checked ? hidden.filter((x) => x !== id) : [...hidden, id] })} />
+                    onChange={(e) => {
+                      const cur = currentSettings().hiddenPages ?? [];
+                      save({ hiddenPages: e.target.checked ? cur.filter((x) => x !== id) : [...cur.filter((x) => x !== id), id] });
+                    }} />
                   <span className="box" /> {id === "easy" ? t("easy.button") : t("nav." + id)}
                 </label>
               );
@@ -121,7 +124,7 @@ export function SettingsPage() {
 
         <div className="card stack">
           <h2>{t("settings.about")}</h2>
-          <p className="hint">Glowsmith · {t("settings.version", { v: boot!.version })}</p>
+          <p className="hint">DMX Light Control · {t("settings.version", { v: boot!.version })}</p>
         </div>
       </div>
     </div>

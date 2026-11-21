@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type ScreenSyncSettings } from "../api";
 import { useT } from "../i18n";
 import { useShow } from "../store";
@@ -24,7 +24,17 @@ export function useScreenSync() {
     const h = setInterval(load, 400);
     return () => { alive = false; clearInterval(h); };
   }, []);
-  const save = (c: Partial<ScreenSyncSettings>) => api.screenSync({ ...set, ...c });
+  // the server replaces the whole settings object: always send the newest version (own saves not yet echoed
+  // included), so an older closure (arrow-key timer, slider) never undoes another change
+  const latest = useRef(set);
+  const serverJson = useRef("");
+  const json = JSON.stringify(set);
+  if (json !== serverJson.current) { serverJson.current = json; latest.current = set; }
+  const save = (c: Partial<ScreenSyncSettings>) => {
+    const next = { ...latest.current, ...c };
+    latest.current = next;
+    return api.screenSync(next);
+  };
   return { set, info, cams, camera, save, lamps: Math.max(1, full!.rig.heads) };
 }
 type ScreenSync = ReturnType<typeof useScreenSync>;

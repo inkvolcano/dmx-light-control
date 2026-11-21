@@ -131,7 +131,7 @@ public sealed class WinUsbTransport : IUdmxTransport, ICancellableTransport
         if (fileHandle == INVALID)
         {
             int e = Marshal.GetLastWin32Error();
-            if (e == 5 || e == 32) throw new UdmxException(UdmxFault.InUse, "uDMX is in gebruik door een ander programma (code " + e + "). Sluit v1.4, QLC+ of een tweede Glowsmith.", e);
+            if (e == 5 || e == 32) throw new UdmxException(UdmxFault.InUse, "uDMX is in gebruik door een ander programma (code " + e + "). Sluit v1.4, QLC+ of een tweede DMX Light Control.", e);
             throw UdmxException.FromWin32(e, "Kan uDMX niet openen");
         }
         if (!WinUsb_Initialize(fileHandle, out usbHandle))

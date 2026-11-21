@@ -33,6 +33,8 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
   const box = useRef<HTMLDivElement>(null);
   const [p, setP] = useState<number[]>(() => pointsFor(set, lamps));
   const latest = useRef(p);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const drag = useRef<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [src, setSrc] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
   useEffect(() => {
     if (!local) return;
     let alive = true, url: string | null = null;
+    setSrc(null); setError(null);   // a new source: never keep showing the old picture
     (async () => {
       while (alive) {
         try {
@@ -67,6 +70,8 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
   useEffect(() => {
     if (selected == null) return;
     let timer: number | undefined;
+    // clicking anywhere outside the picture lets go of the marker (and of the arrow keys)
+    const outside = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setSelected(null); };
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
@@ -79,10 +84,16 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
       n[selected * 2 + 1] = Math.min(1, Math.max(0, Math.round((n[selected * 2 + 1] + dy) * 1000) / 1000));
       latest.current = n; setP(n);
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => onChange(latest.current), 300);
+      timer = window.setTimeout(() => { timer = undefined; onChangeRef.current(latest.current); }, 300);
     };
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); window.clearTimeout(timer); };
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", outside);
+      // a nudge still waiting is saved now, not dropped (Escape or leaving the page right after it)
+      if (timer !== undefined) { window.clearTimeout(timer); onChangeRef.current(latest.current); }
+    };
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const point = (e: React.PointerEvent) => {
@@ -102,14 +113,14 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
     n[drag.current * 2 + 1] = Math.round(y * 1000) / 1000;
     latest.current = n; setP(n);
   };
-  const up = () => { if (drag.current == null) return; drag.current = null; onChange(latest.current); };
+  const up = () => { if (drag.current == null) return; drag.current = null; onChangeRef.current(latest.current); };
   // click on the picture: the selected marker jumps there
   const place = (e: React.PointerEvent) => {
     if (selected == null || drag.current != null) return;
     const [x, y] = point(e);
     const n = [...latest.current];
     n[selected * 2] = Math.round(x * 1000) / 1000; n[selected * 2 + 1] = Math.round(y * 1000) / 1000;
-    latest.current = n; setP(n); onChange(n);
+    latest.current = n; setP(n); onChangeRef.current(n);
   };
 
   const size = Math.min(50, Math.max(1, set.pointSize ?? 8));   // % of the width; square on a 16:9 picture
@@ -124,6 +135,7 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
                 {grid.cells.map((c, i) => <span key={i} style={{ background: c }} />)}
               </div>
             : <div className="cam-wait">{error ?? t("pts.noPicture")}</div>}
+        {error && src && <div className="cam-error">{error}</div>}
         {Array.from({ length: lamps }, (_, i) => (
           <span key={"a" + i} className={"pts-area" + (selected === i ? " sel" : "")}
             style={{ left: `${p[i * 2] * 100}%`, top: `${p[i * 2 + 1] * 100}%`, width: `${size}%`, height: `${size * 16 / 9}%` }} />

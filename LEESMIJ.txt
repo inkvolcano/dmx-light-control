@@ -1,5 +1,5 @@
-Glowsmith - lichtbesturing (tot versie 2.1.7 heette dit programma DmxLicht)
-==========================================================================
+DMX Light Control - lichtbesturing (eerder DmxLicht en Glowsmith)
+==================================================================
 Alleen de naam is anders: het programma is nog steeds DmxLicht.exe en je show blijft gewoon staan.
 
 STARTEN
@@ -66,7 +66,7 @@ HANDIG
 
 STREAM DECK (Bitfocus Companion)
 - Koppelingen > Stream Deck (Companion) > "Installeren in Companion". Daarna Companion
-  (her)starten en de verbinding "Glowsmith" toevoegen.
+  (her)starten en de verbinding "DMX Light Control" toevoegen.
 
 GEEN VENSTER?
 Als het venster leeg blijft, start "DmxLicht.exe --browser": de bediening opent dan in je

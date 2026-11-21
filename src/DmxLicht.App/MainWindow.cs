@@ -17,7 +17,7 @@ sealed class MainWindow : Form
     public MainWindow(string url)
     {
         this.url = url;
-        Text = "Glowsmith";
+        Text = "DMX Light Control";
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
         BackColor = Color.FromArgb(24, 24, 27);
         StartPosition = FormStartPosition.CenterScreen;
@@ -75,7 +75,7 @@ sealed class TrayContext : ApplicationContext
         menu.Items.Add("Afsluiten / Quit", null, (_, _) => ExitThread());
         icon = new NotifyIcon
         {
-            Text = "Glowsmith",
+            Text = "DMX Light Control",
             Icon = SafeIcon(),
             ContextMenuStrip = menu,
             Visible = true,

@@ -262,6 +262,7 @@ public sealed class UdmxOutput : IDmxOutput
                     connectedSince = DateTime.Now;
                     fault = null; error = null; lastConnectError = null;
                     needFull = true; failures = 0; attempt = 0; haveSent = false;
+                    droppedJustNow = false; goneFromBus = false;
                     status = "Verbonden met uDMX";
                     Log.Write(reconnects > 0 ? "Opnieuw verbonden met uDMX (herverbonden: " + reconnects + ")" : "Verbonden met uDMX");
                 }
@@ -272,17 +273,23 @@ public sealed class UdmxOutput : IDmxOutput
                     fault = f.ToString();
                     error = ex.Message;
                     status = "Geen verbinding: " + ex.Message + " Ik probeer het opnieuw...";
+                    // gone right after a working connection (Windows may need a moment before it reports "not found")
                     if (droppedJustNow && f == UdmxFault.NotFound)
                     {
-                        // gone right after a working connection: Windows no longer sees it on USB at all
+                        goneFromBus = true;
                         lastConnectError = ex.Message;
-                        status = "De dongle is van de USB-bus verdwenen. Steek hem opnieuw in; ik maak vanzelf weer verbinding.";
-                        error = status;
                         Log.Write("uDMX is van de USB-bus verdwenen: Windows ziet hem niet meer (stekker, kabel, USB-poort, " +
                                   "stroom of een storing via de DMX-kabel). Opnieuw insteken helpt; ik maak dan vanzelf weer verbinding.");
                     }
                     else if (ex.Message != lastConnectError) { lastConnectError = ex.Message; Log.Write("Verbinden mislukt: " + ex.Message); }
-                    droppedJustNow = false;
+                    if (f != UdmxFault.NotFound) goneFromBus = false;      // another fault: show that one
+                    if (goneFromBus)
+                    {
+                        status = "De dongle is van de USB-bus verdwenen. Steek hem opnieuw in; ik maak vanzelf weer verbinding.";
+                        error = status;
+                    }
+                    // keep waiting for the first "not found" while Windows is still busy with the device
+                    if (f == UdmxFault.NotFound) droppedJustNow = false;
                     int wait = f == UdmxFault.NotFound ? opt.NotFoundPollMs
                              : Math.Min(opt.ReconnectMaxMs, opt.ReconnectMinMs << Math.Min(attempt++, 6));
                     Wait(wait);
@@ -354,6 +361,8 @@ public sealed class UdmxOutput : IDmxOutput
 
     /// <summary>Set when a working connection is lost; the next attempt tells "gone from USB" apart from other faults.</summary>
     volatile bool droppedJustNow;
+    /// <summary>The dongle left the USB bus after working: shown until it is back.</summary>
+    volatile bool goneFromBus;
 
     void Drop(string reason)
     {

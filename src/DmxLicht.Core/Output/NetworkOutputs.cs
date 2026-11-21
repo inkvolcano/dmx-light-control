@@ -223,7 +223,7 @@ public sealed class SacnOutput : NetworkOutput
         // framing layer
         FlagsLength(p, 38, 638 - 38);
         p[43] = 0x02;                                               // VECTOR_E131_DATA_PACKET
-        Encoding.UTF8.GetBytes("Glowsmith").CopyTo(p, 44);           // source name (64 bytes)
+        Encoding.UTF8.GetBytes("DMX Light Control").CopyTo(p, 44);           // source name (64 bytes)
         p[108] = (byte)Math.Clamp(priority, 0, 200);
         p[111] = sequence;
         p[113] = (byte)(universe >> 8); p[114] = (byte)universe;

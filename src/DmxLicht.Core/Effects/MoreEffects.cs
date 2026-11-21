@@ -51,7 +51,7 @@ static class MoreEffects
         {
             const string sos = "10101" + "000" + "11101110111" + "000" + "10101" + "0000000";
             long unit = Math.Max(60, f.On);
-            return Lit(f.A(i), sos[(int)(f.Ms / unit % sos.Length)] == '1');
+            return Lit(f.A(i), sos[(int)Mod(f.Ms / unit, sos.Length)] == '1');
         }),
         E("blink-pairs", "onoff", "Paren knipperen", ColorA | OnOff, (f, i) =>
             Lit(f.A(i), Mod(f.Ms - ((i / 2) % 2) * (f.Period / 2), f.Period) < f.On)),

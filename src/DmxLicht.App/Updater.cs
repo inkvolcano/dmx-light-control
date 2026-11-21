@@ -134,7 +134,7 @@ static class Updater
             string script = Path.Combine(Path.GetTempPath(), "dmxlicht-update.cmd");
             File.WriteAllText(script,
                 "@echo off\r\n" +
-                "title Glowsmith bijwerken\r\n" +
+                "title DMX Light Control bijwerken\r\n" +
                 $"set PID={Environment.ProcessId}\r\n" +
                 ":wait\r\n" +
                 // full paths: a "find" from Git or Cygwin earlier in PATH would end the wait too soon

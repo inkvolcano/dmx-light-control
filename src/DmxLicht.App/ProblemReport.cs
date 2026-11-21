@@ -33,7 +33,7 @@ static class ProblemReport
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
             Text(zip, "LEESMIJ.txt",
-                "Glowsmith probleemrapport\r\n=========================\r\n" +
+                "DMX Light Control probleemrapport\r\n=================================\r\n" +
                 "Gemaakt: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\r\n\r\n" +
                 (string.IsNullOrWhiteSpace(note) ? "" : "Wat er gebeurde (door de gebruiker):\r\n" + note.Trim() + "\r\n\r\n") +
                 "info.txt      - versie, Windows, uitgangen, lampen\r\n" +
@@ -63,7 +63,7 @@ static class ProblemReport
     public static async Task<string> SaveAndShowAsync(LightEngine engine, AudioInput audio, string note)
     {
         byte[] data = await BuildAsync(engine, audio, note);
-        string name = "Glowsmith-rapport-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".zip";
+        string name = "DMX-Light-Control-rapport-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".zip";
         string dir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) dir = Log.Dir;
         string path = Path.Combine(dir, name);
@@ -76,7 +76,7 @@ static class ProblemReport
     static string Info(LightEngine engine, AudioInput audio)
     {
         var b = new StringBuilder();
-        b.AppendLine("Versie:       Glowsmith " + Log.AppVersion);
+        b.AppendLine("Versie:       DMX Light Control " + Log.AppVersion);
         b.AppendLine("Map:          " + AppDomain.CurrentDomain.BaseDirectory);
         b.AppendLine("Windows:      " + Environment.OSVersion + (Environment.Is64BitOperatingSystem ? " 64-bit" : " 32-bit"));
         b.AppendLine(".NET:         " + Environment.Version);

@@ -302,6 +302,28 @@ public class UdmxOutputTests
     }
 
     [Fact]
+    public void DongleGoneFromTheBusStaysReportedUntilItIsBack()
+    {
+        var (o, d) = Start();
+        try
+        {
+            o.SetFrame(Frame(3, 20), 20);
+            WaitFor(() => d.Opens >= 1 && o.Connected, "connected");
+            d.Unplug();
+            WaitFor(() => o.Error != null && o.Error.Contains("USB-bus"), "gone-from-USB message");
+            Thread.Sleep(150);                                  // many more 'not found' attempts (poll 5 ms)
+            Assert.Contains("USB-bus", o.Error);                // still the clear message, not the generic one
+            Assert.Contains("USB-bus", o.Status);
+
+            d.Plugged = true;
+            WaitFor(() => o.Connected, "back after replug");
+            Assert.Null(o.Error);
+            Assert.DoesNotContain("USB-bus", o.Status);
+        }
+        finally { o.Stop(); }
+    }
+
+    [Fact]
     public void DongleInUseByAnotherProgramIsReported()
     {
         var d = new FakeDongle { InUse = true };

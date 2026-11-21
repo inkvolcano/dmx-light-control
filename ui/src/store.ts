@@ -138,6 +138,8 @@ function openSocket() {
  * goes out before the server's update arrived does not put the first change back.
  */
 let optimisticSettings: AppSettings | null = null;
+/** The settings including changes still on their way to the server. */
+export function currentSettings(): AppSettings { return optimisticSettings ?? showStore.get().full!.settings; }
 export async function updateSettings(change: Partial<AppSettings>) {
   const base = optimisticSettings ?? showStore.get().full!.settings;
   const next = { ...base, ...change } as AppSettings;

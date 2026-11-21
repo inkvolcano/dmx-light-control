@@ -62,11 +62,13 @@ export function CameraFrameEditor({ corners, onChange }: { corners: number[]; on
   const box = useRef<HTMLDivElement>(null);
   const latest = useRef(c);
   latest.current = c;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const drag = useRef<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [aspect, setAspect] = useState(16 / 9);
   const [detect, setDetect] = useState<string | null>(null);
-  const apply = (n: number[]) => { setC(n); onChange(n); };
+  const apply = (n: number[]) => { setC(n); onChangeRef.current(n); };
   const tool = (kind: string, dir: number) => apply(adjust(c, kind, dir, aspect));
   const autoFind = async () => {
     setDetect(t("cam.searching"));
@@ -81,7 +83,10 @@ export function CameraFrameEditor({ corners, onChange }: { corners: number[]; on
   // arrow keys move the selected corner (Shift = bigger steps)
   useEffect(() => {
     if (selected == null) return;
+    const outside = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setSelected(null); };
     const key = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;   // typing in a field is not a nudge
       const dx = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0, dy = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
       if (!dx && !dy) { if (e.key === "Escape") setSelected(null); return; }
       e.preventDefault();
@@ -91,12 +96,13 @@ export function CameraFrameEditor({ corners, onChange }: { corners: number[]; on
         n[selected * 2] = clamp(n[selected * 2] + dx * step);
         n[selected * 2 + 1] = clamp(n[selected * 2 + 1] + dy * step);
         clearTimeout(keyTimer.current);
-        keyTimer.current = window.setTimeout(() => onChange(n), 300);
+        keyTimer.current = window.setTimeout(() => onChangeRef.current(n), 300);
         return n;
       });
     };
     window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    document.addEventListener("pointerdown", outside);
+    return () => { window.removeEventListener("keydown", key); document.removeEventListener("pointerdown", outside); };
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
   const keyTimer = useRef<number | undefined>(undefined);
   useEffect(() => { if (drag.current == null) setC(corners); }, [corners.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -162,6 +168,7 @@ export function CameraFrameEditor({ corners, onChange }: { corners: number[]; on
       <div className="cam-frame" ref={box} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         {src ? <img src={src} alt="" draggable={false} onLoad={(e) => { const im = e.currentTarget; if (im.naturalHeight) setAspect(im.naturalWidth / im.naturalHeight); }} />
           : <div className="cam-wait">{error ?? t("cam.starting")}</div>}
+        {error && src && <div className="cam-error">{error}</div>}
         <svg viewBox="0 0 100 100" preserveAspectRatio="none">
           <polygon points={pts} className="cam-poly" />
           {gridLines.map(([x1, y1, x2, y2], k) => (

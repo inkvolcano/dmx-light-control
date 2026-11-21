@@ -139,7 +139,7 @@ static class Api
             if (!local && !string.IsNullOrEmpty(pin) && ctx.Request.Headers["X-Dmx-Pin"] != pin && ctx.Request.Query["pin"] != pin)
                 return Results.Text("locked", statusCode: 403);
             ctx.Response.ContentType = "application/zip";
-            ctx.Response.Headers.ContentDisposition = $"attachment; filename=\"Glowsmith-backup-{DateTime.Now:yyyyMMdd-HHmm}.zip\"";
+            ctx.Response.Headers.ContentDisposition = $"attachment; filename=\"DMX-Light-Control-backup-{DateTime.Now:yyyyMMdd-HHmm}.zip\"";
             var ms = new MemoryStream();
             ShowLibrary.WriteBackupZip(ms, engine.Read(sh =>
             {
@@ -150,7 +150,7 @@ static class Api
                 return c.ToJson();
             }));
             ms.Position = 0;
-            return Results.Stream(ms, "application/zip", $"Glowsmith-backup-{DateTime.Now:yyyyMMdd-HHmm}.zip");
+            return Results.Stream(ms, "application/zip", $"DMX-Light-Control-backup-{DateTime.Now:yyyyMMdd-HHmm}.zip");
         });
         api.MapPost("/restore", async (IFormFile file) =>
         {
@@ -987,7 +987,7 @@ static class Api
         });
         api.MapGet("/report.zip", async (HttpRequest req) =>
             Results.File(await ProblemReport.BuildAsync(engine, audio, req.Query["note"].ToString()), "application/zip",
-                "Glowsmith-rapport-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".zip"));
+                "DMX-Light-Control-rapport-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".zip"));
 
         // last part of the log, newest last (for diagnosing drop-outs from a tablet too)
         api.MapGet("/log", () => Results.Text(string.Join("\n", Log.Tail(300))));

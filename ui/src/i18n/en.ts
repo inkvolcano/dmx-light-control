@@ -1,6 +1,6 @@
 import { helpEn } from "./help.en";
 export const en: Record<string, string> = {
-  "app.name": "Glowsmith",
+  "app.name": "DMX Light Control",
   "nav.live": "Control",
   "nav.effects": "Effects",
   "nav.faders": "Faders",
@@ -206,7 +206,7 @@ export const en: Record<string, string> = {
   "color.white-amber": "White + amber", "color.red-white": "Red + white", "color.green-white": "Green + white", "color.blue-white": "Blue + white",
 
   // output diagnostics
-  "settings.preventSleep": "Prevent sleep while Glowsmith runs; keeps the screen on too (on many laptops the screen switching off puts the PC to sleep, and sleep disconnects the dongle)",
+  "settings.preventSleep": "Prevent sleep while DMX Light Control runs; keeps the screen on too (on many laptops the screen switching off puts the PC to sleep, and sleep disconnects the dongle)",
   "faultShort.NotFound": "No {name}",
   "faultShort.DriverMissing": "{name}: driver missing",
   "faultShort.InUse": "{name} in use",
@@ -461,7 +461,7 @@ export const en: Record<string, string> = {
 
   // companion install
   "cm.title": "Stream Deck (Companion)",
-  "cm.hint": "The Companion module comes with Glowsmith. One click and it is in Bitfocus Companion: buttons for scenes, blackout, flash, tap and more.",
+  "cm.hint": "The Companion module comes with DMX Light Control. One click and it is in Bitfocus Companion: buttons for scenes, blackout, flash, tap and more.",
   "cm.companion": "Companion",
   "cm.found": "found",
   "cm.running": "found, running now",
@@ -474,8 +474,8 @@ export const en: Record<string, string> = {
   "cm.update": "Update in Companion",
   "cm.reinstall": "Reinstall",
   "cm.installing": "Installing...",
-  "cm.done": "Installed. Start Companion and add the connection 'Glowsmith'.",
-  "cm.doneRestart": "Installed. Restart Companion, then add the connection 'Glowsmith'.",
+  "cm.done": "Installed. Start Companion and add the connection 'DMX Light Control'.",
+  "cm.doneRestart": "Installed. Restart Companion, then add the connection 'DMX Light Control'.",
   "cm.installCompanion": "Install Bitfocus Companion first (bitfocus.io/companion) and start it once; then the module can go in.",
 
   // sound effects

@@ -1,4 +1,4 @@
-// Bitfocus Companion module for Glowsmith (formerly DmxLicht).
+// Bitfocus Companion module for DMX Light Control (formerly DmxLicht and Glowsmith).
 // Talks to the app's HTTP API (/api/cmd/...) and follows its state over the WebSocket (/ws).
 const { InstanceBase, InstanceStatus, runEntrypoint, combineRgb } = require('@companion-module/base')
 
@@ -53,7 +53,7 @@ class DmxLichtInstance extends InstanceBase {
 
 	getConfigFields() {
 		return [
-			{ type: 'static-text', id: 'info', width: 12, label: 'Glowsmith', value: 'Address of the PC running Glowsmith. From another PC: turn on "Control from tablet or phone" in Glowsmith and fill in the key from its Integrations page.' },
+			{ type: 'static-text', id: 'info', width: 12, label: 'DMX Light Control', value: 'Address of the PC running DMX Light Control. From another PC: turn on "Control from tablet or phone" in DMX Light Control and fill in the key from its Integrations page.' },
 			{ type: 'textinput', id: 'host', label: 'Host', width: 6, default: '127.0.0.1' },
 			{ type: 'number', id: 'port', label: 'Port', width: 3, default: 5150, min: 1, max: 65535 },
 			{ type: 'textinput', id: 'key', label: 'Key (only needed from another PC)', width: 6, default: '' },

@@ -60,7 +60,7 @@ export function App() {
   const hiddenKey = (full?.settings.hiddenPages ?? []).join(",");
   useEffect(() => {
     if (!isShown(page, full?.settings.hiddenPages)) setPage(pages.find((p) => isShown(p.id, full?.settings.hiddenPages))?.id ?? "settings");
-  }, [hiddenKey, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hiddenKey]); // eslint-disable-line react-hooks/exhaustive-deps -- not on page: a hidden page opened from elsewhere stays open
   // other parts of the app can open a page (e.g. the effects panel opens the Screen page)
   useEffect(() => {
     const go = (e: Event) => { const p = (e as CustomEvent<string>).detail; if (pages.some((x) => x.id === p)) setPage(p as PageId); };
@@ -115,7 +115,7 @@ export function App() {
   return (
     <div className="shell">
       <nav className="sidebar">
-        <div className="brand" title="Glowsmith"><div className="brand-dot" /></div>
+        <div className="brand" title="DMX Light Control"><div className="brand-dot" /></div>
         {pages.filter((p) => isShown(p.id, full?.settings.hiddenPages)).map((p) => (
           <button key={p.id} className={"nav-btn" + (page === p.id ? " active" : "")} onClick={() => setPage(p.id)}>
             <Icon name={p.icon} />

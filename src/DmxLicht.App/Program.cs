@@ -72,10 +72,10 @@ static class Program
         using var single = new Mutex(true, @"Local\DmxLicht.Output", out bool firstInstance);
         if (!firstInstance && !args.Contains("--allow-second"))
         {
-            const string msg = "Glowsmith draait al op deze pc (kijk in de taakbalk of bij de klok).\n" +
-                               "Glowsmith is already running on this PC.";
+            const string msg = "DMX Light Control draait al op deze pc (kijk in de taakbalk of bij de klok).\n" +
+                               "DMX Light Control is already running on this PC.";
             if (headless) Console.Error.WriteLine(msg);
-            else MessageBox.Show(msg, "Glowsmith", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else MessageBox.Show(msg, "DMX Light Control", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -84,9 +84,9 @@ static class Program
         Application.ThreadException += (_, e) => Log.Crash("venster", e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Crash(e.IsTerminating ? "app (afgesloten)" : "app", e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Crash("achtergrondtaak", e.Exception); e.SetObserved(); };
-        Log.Write("Glowsmith " + Log.AppVersion + " start op " + Environment.OSVersion);
+        Log.Write("DMX Light Control " + Log.AppVersion + " start op " + Environment.OSVersion);
         // every normal end leaves a line; a log that just stops means the app was killed or crashed hard
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => Log.Write("Glowsmith afgesloten");
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Log.Write("DMX Light Control afgesloten");
         AppHealth.StartStallWatch();
 
         ShowFile show = LoadShow();
@@ -149,7 +149,7 @@ static class Program
         {
             if (headless)
             {
-                Console.WriteLine("Glowsmith draait op " + url + " (Ctrl+C om te stoppen)");
+                Console.WriteLine("DMX Light Control draait op " + url + " (Ctrl+C om te stoppen)");
                 var done = new ManualResetEventSlim();
                 ExitApp = done.Set;
                 Console.CancelKeyPress += (_, e) => { e.Cancel = true; done.Set(); };

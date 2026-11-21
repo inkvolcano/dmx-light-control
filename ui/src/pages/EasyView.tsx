@@ -69,7 +69,7 @@ export function EasyView({ locked, onFull, onHelp }: { locked: boolean; onFull: 
     <div className="easy">
       <header className="easy-top">
         <div className="brand-dot" />
-        <b className="easy-title">Glowsmith</b>
+        <b className="easy-title">DMX Light Control</b>
         <span className={"chip " + (output.connected ? "ok" : "warn")} title={output.connected ? "" : t("fault." + (output.fault ?? "Other"))}>
           <span className="dot" />{output.connected ? output.name : t("easy.noDongle")}
         </span>

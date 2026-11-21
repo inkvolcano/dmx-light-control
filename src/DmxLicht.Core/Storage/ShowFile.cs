@@ -66,7 +66,7 @@ public sealed class MqttSettings
     /// <summary>Home Assistant's discovery prefix.</summary>
     public string Discovery { get; set; } = "homeassistant";
     /// <summary>Device name in Home Assistant.</summary>
-    public string Name { get; set; } = "Glowsmith";
+    public string Name { get; set; } = "DMX Light Control";
 }
 
 /// <summary>Sections of the easy (phone/operator) mode; the basics (on/off, brightness, scenes) are always there.</summary>

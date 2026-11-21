@@ -1,16 +1,16 @@
-# Glowsmith
+# DMX Light Control
 
 DMX lighting control for Windows: a portable app (nothing to install) with a web interface, for a uDMX USB
 dongle, Art-Net or sACN. Interface in Dutch and English.
 
-Glowsmith was called **DmxLicht** until version 2.1.7. Only the name you see changed: the program file is still
-`DmxLicht.exe`, releases are still `DmxLicht-<version>.zip`, and the code keeps the `DmxLicht.*` project names, so
-existing installs, shows and the Companion connection carry on as before.
+DMX Light Control was called **DmxLicht** until version 2.1.7 and **Glowsmith** until 2.1.14. Only the name you see
+changed: the program file is still `DmxLicht.exe`, releases are still `DmxLicht-<version>.zip`, and the code keeps the
+`DmxLicht.*` project names, so existing installs, shows and the Companion connection carry on as before.
 
 **Download:** the latest `DmxLicht-<version>.zip` from [Releases](https://github.com/inkvolcano/dmx-light-control/releases).
 Unzip anywhere and start `DmxLicht.exe` (Windows 10/11, x64). The app updates itself from Releases (Settings > Updates).
 
-Glowsmith grew from a colleague's single-file WinForms app *DMX Lichtbesturing v1.4*. The DMX output for v1.4's
+DMX Light Control grew from a colleague's single-file WinForms app *DMX Lichtbesturing v1.4*. The DMX output for v1.4's
 features is proven identical by 2,520 recorded reference frames (`tests/DmxLicht.Tests/golden`). The original
 source is not part of this public repository.
 
