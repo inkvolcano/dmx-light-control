@@ -129,6 +129,7 @@ static class Program
         web.StartAsync().GetAwaiter().GetResult();
         engine.Start();
         string url = $"http://127.0.0.1:{port}/";
+        Updater.CleanUp();
         // new version on GitHub? check shortly after start and then daily (only shows a notice; installing is a click)
         _ = Task.Run(async () =>
         {
@@ -169,6 +170,10 @@ static class Program
         }
         finally
         {
+            // safety net: once the show is saved the app always ends, even if a device or library hangs on
+            // shutdown (an updater waiting for us must never wait forever)
+            new Thread(() => { Thread.Sleep(10000); Log.Write("Afsluiten duurde te lang: app wordt beëindigd"); Environment.Exit(0); })
+                { IsBackground = true, Name = "exit watchdog" }.Start();
             saver.Flush();
             web.StopAsync().GetAwaiter().GetResult();
         }
@@ -195,6 +200,8 @@ static class Program
         });
         builder.Logging.ClearProviders();
         builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o => o.MultipartBodyLengthLimit = 300_000_000);
+        // closing or restarting the web part never waits long for open pages (default is 30 s)
+        builder.Services.Configure<Microsoft.Extensions.Hosting.HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(3));
         builder.WebHost.UseKestrel(k =>
         {
             k.Limits.MaxRequestBodySize = 300_000_000; // songs

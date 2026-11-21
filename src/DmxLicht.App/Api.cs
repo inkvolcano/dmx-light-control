@@ -974,7 +974,9 @@ static class Api
             if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
             using WebSocket ws = await ctx.WebSockets.AcceptWebSocketAsync();
             using IDisposable tracked = PhoneAccess.Track(ctx.Connection.RemoteIpAddress);
-            await LiveLoop(ws, engine, audio, ctx.RequestAborted);
+            // also ends when the app stops: an open page must not hold up closing, updating or a web restart
+            using var stop = CancellationTokenSource.CreateLinkedTokenSource(ctx.RequestAborted, app.Lifetime.ApplicationStopping);
+            await LiveLoop(ws, engine, audio, stop.Token);
         });
     }
 

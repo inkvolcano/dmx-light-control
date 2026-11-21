@@ -41,6 +41,20 @@ static class Updater
 
     public static bool Available => Latest != null && IsNewer(Latest.Version, Log.AppVersion);
 
+    /// <summary>At start: remove what the previous update left behind (the old exe, the downloaded zip).</summary>
+    public static void CleanUp()
+    {
+        try { string old = Path.Combine(AppContext.BaseDirectory, "DmxLicht.old.exe"); if (File.Exists(old)) File.Delete(old); } catch { }
+        try
+        {
+            string dir = Path.Combine(Log.Dir, "Updates");
+            if (Directory.Exists(dir))
+                foreach (string f in Directory.GetFiles(dir, "DmxLicht-*.zip"))
+                    if (!IsNewer(Path.GetFileNameWithoutExtension(f).Replace("DmxLicht-", ""), Log.AppVersion)) File.Delete(f);
+        }
+        catch { }
+    }
+
     public static async Task<Release> CheckAsync()
     {
         State = "checking"; Error = null;
@@ -115,15 +129,25 @@ static class Updater
             if (!File.Exists(Path.Combine(stage, "DmxLicht.exe"))) throw new InvalidOperationException("DmxLicht.exe ontbreekt in de update");
 
             string appDir = AppContext.BaseDirectory.TrimEnd('\\');
+            // start the new version the way this one was started (--browser, --headless, ...)
+            string args = string.Join(" ", Environment.GetCommandLineArgs().Skip(1).Select(x => "\"" + x.Replace("\"", "") + "\""));
             string script = Path.Combine(Path.GetTempPath(), "dmxlicht-update.cmd");
             File.WriteAllText(script,
                 "@echo off\r\n" +
                 "title DmxLicht bijwerken\r\n" +
                 $"set PID={Environment.ProcessId}\r\n" +
                 ":wait\r\n" +
-                "tasklist /FI \"PID eq %PID%\" 2>nul | find \"%PID%\" >nul && (timeout /t 1 /nobreak >nul & goto wait)\r\n" +
-                $"robocopy \"{stage}\" \"{appDir}\" /E /XD Instellingen /R:10 /W:1 /NFL /NDL /NJH /NJS >nul\r\n" +
-                $"start \"\" \"{Path.Combine(appDir, "DmxLicht.exe")}\"\r\n" +
+                // full paths: a "find" from Git or Cygwin earlier in PATH would end the wait too soon
+                "\"%SystemRoot%\\System32\\tasklist.exe\" /FI \"PID eq %PID%\" 2>nul | \"%SystemRoot%\\System32\\find.exe\" \"%PID%\" >nul && (\"%SystemRoot%\\System32\\ping.exe\" -n 2 127.0.0.1 >nul & goto wait)\r\n" +
+                $"cd /d \"{appDir}\"\r\n" +
+                // Windows keeps a just-closed program locked for a moment (and virus scanners may too); a locked
+                // exe can still be renamed, so move it aside and put the new one in its place
+                "if exist DmxLicht.old.exe del /f /q DmxLicht.old.exe >nul 2>&1\r\n" +
+                "move /y DmxLicht.exe DmxLicht.old.exe >nul 2>&1\r\n" +
+                $"robocopy \"{stage}\" \"{appDir}\" /E /XD Instellingen /R:30 /W:1 /NFL /NDL /NJH /NJS >nul\r\n" +
+                // anything went wrong: the old version comes back, so the app always starts again
+                "if not exist DmxLicht.exe move /y DmxLicht.old.exe DmxLicht.exe >nul 2>&1\r\n" +
+                $"start \"\" \"{Path.Combine(appDir, "DmxLicht.exe")}\" {args}\r\n" +
                 $"rmdir /s /q \"{stage}\" >nul 2>&1\r\n" +
                 "del \"%~f0\"\r\n");
             Log.Write($"Bijwerken naar {rel.Version}: app sluit en start opnieuw");
