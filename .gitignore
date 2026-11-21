@@ -1,0 +1,18 @@
+bin/
+obj/
+publish/
+.vs/
+*.user
+Instellingen/
+tools/GoldenHarness/out/
+tools/UiSnapshot/out/
+
+# third-party driver package (binaries); kept in the folder, not in git
+uDMX_Driver_*.zip
+
+# frontend build output and dependencies (Bouwen.bat / npm run build recreate them)
+ui/node_modules/
+src/DmxLicht.App/wwwroot/
+publish/
+ui/*.tsbuildinfo
+publish/

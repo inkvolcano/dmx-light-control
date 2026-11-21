@@ -1,0 +1,78 @@
+DmxLicht 2.1 - lichtbesturing
+=============================
+
+STARTEN
+1. Pak de zip uit in een map (bijv. op het bureaublad of een USB-stick).
+2. Dubbelklik DmxLicht.exe. Er hoeft niets geinstalleerd te worden.
+   (Windows SmartScreen kan de eerste keer waarschuwen: "Meer info" > "Toch uitvoeren".)
+3. Alles wordt bewaard in de map "Instellingen" naast de exe. Neem de hele map mee
+   naar een andere pc, dan gaan je lampen, scenes en tijdlijnen mee.
+
+USB-DONGLE (uDMX)
+- Windows heeft eenmalig een driver nodig: WinUSB (met Zadig, https://zadig.akeo.ie)
+  of het libusbK-pakket. Werkte v1.4 al op deze pc, dan is dat al gebeurd.
+- Rechtsboven zie je of de dongle verbonden is. Valt hij weg, dan verbindt de app vanzelf
+  opnieuw. Instellingen > Uitgang laat zien wat er gebeurt, met tips tegen wegvallen.
+- Draai maar EEN programma tegelijk met de dongle (dus niet ook v1.4 of QLC+).
+- Geen dongle? Art-Net en sACN (Instellingen > Uitgangen) sturen via het netwerk.
+
+OVERSTAPPEN VAN v1.4
+- Zet DmxLicht.exe in dezelfde map als de oude DmxLicht_v1.4.exe (met de map Instellingen).
+  Bij de eerste start worden lampen, adressen, effectinstellingen en eigen kleuren overgenomen.
+
+TELEFOON OF TABLET
+- Instellingen > Telefoon of tablet: zet "Bedienen vanaf telefoon of tablet" aan en scan de
+  QR-code met de camera van je telefoon (zelfde wifi). Er hoeft niets geinstalleerd te worden.
+- Op de telefoon opent de EENVOUDIGE BEDIENING: grote knoppen voor aan/uit, helderheid, scenes,
+  kleuren, effecten, TAP en tijdlijnen. "Alles" geeft de volledige app.
+- Als app op je beginscherm: iPhone (Safari) Deel > "Zet op beginscherm";
+  Android (Chrome) menu > "Toevoegen aan startscherm".
+- Lukt verbinden niet? Klik daar "Firewall openzetten" (vraagt beheerdersrechten).
+- Ook op de pc kan het: knop "Eenvoudig" linksonder.
+- iPhone-knoppen, Siri en automatisch (bijv. bij een bericht): zie Koppelingen.
+
+PAGINA'S
+- Bediening:    lampen aan/uit en kleuren, scenes (knoppen), groepen, overgangstijd, strobo-snelheid.
+                Klik lampen om ze te kiezen; sleep ze over het podium.
+- Effecten:     "Scherm volgen": de lampen nemen de kleuren van het pc-scherm over (ambilight),
+                of van een tv via een webcam (kader op de tv slepen).
+                66 effecten, voor alle lampen of per groep (bijv. voor regenboog, achter politie).
+                "Eigen chases": maak zelf looplichten en patronen, stap voor stap (schilderen
+                in een raster, met voorbeeld, overvloeien, op de maat, heen en weer, enz.).
+- Tijdlijn:     sleep scenes en effecten op sporen, met muziek (mp3/wav) die meeloopt.
+- Planning:     tijdschema: op vaste tijden of bij zonsondergang/-opkomst een scene, aan/uit, effect
+                of tijdlijn. "Nu doen" probeert het meteen.
+- Muziek:       licht op de maat: tik het tempo (TAP of spatiebalk) of laat de app luisteren
+                naar de microfoon of het geluid van de pc zelf.
+- Faders:       elk kanaal van een lamp los regelen.
+- Lampen:       lamptypes toevoegen (slepen of "Toevoegen"), adres en modus instellen,
+                eigen lamptypes maken of importeren van open-fixture-library.org.
+                "Zoek" laat een lamp wit knipperen zodat je ziet welke het is.
+- Test:         DMX-monitor van alle 512 kanalen, kanalen met de hand zetten, "lamp voor lamp".
+- Koppelingen:  Home Assistant (MQTT: alles verschijnt vanzelf), links (telefoon), OSC (met alle
+                adressen en voorbeelden), MIDI en Stream Deck (Companion).
+                iPhone: knoppen en Siri met de app Opdrachten; Android: MacroDroid (ook bij
+                WhatsApp-berichten). Kies de actie, de link en QR-code staan klaar.
+- Instellingen: taal, shows opslaan/openen, back-up, uitgangen, PIN-code en eenvoudige bediening.
+
+HANDIG
+- F1 of "Hulp" (linksonder): uitleg bij elke pagina, snel beginnen, problemen oplossen.
+  Achter de ? bij knoppen staat korte uitleg.
+- Ctrl+Z maakt ongedaan, Ctrl+Y doet opnieuw.
+- STROBO bovenin: ingedrukt houden.
+- Eenvoudige bediening: stel bij Instellingen een PIN in en vergrendel. Dan ziet iedereen alleen
+  scenes, aan/uit, helderheid, blackout en strobo; de rest vraagt de PIN.
+
+STREAM DECK (Bitfocus Companion)
+- Koppelingen > Stream Deck (Companion) > "Installeren in Companion". Daarna Companion
+  (her)starten en de verbinding "DmxLicht" toevoegen.
+
+GEEN VENSTER?
+Als het venster leeg blijft, start "DmxLicht.exe --browser": de bediening opent dan in je
+gewone browser en de app staat als icoontje rechtsonder bij de klok.
+
+PROBLEMEN (dongle valt weg, crash)?
+- Instellingen > Uitgang: "USB herstellen" en "USB-stroombesparing uitzetten" (helpt vaak op laptops).
+- Gebruik een USB 2.0-poort of een hub met eigen voeding, laptop aan de lader.
+- Instellingen > Probleemrapport > "Rapport maken": er komt een zip op het bureaublad met het
+  logboek, crashmeldingen en de USB-gegevens. Stuur die zip op naar wie je helpt.

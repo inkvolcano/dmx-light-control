@@ -1,0 +1,22 @@
+{
+  "id": "dmxlicht",
+  "name": "dmxlicht",
+  "shortname": "dmxlicht",
+  "description": "DmxLicht - scenes, effects, blackout, flash, tap tempo and timelines",
+  "version": "2.1.6",
+  "license": "GPL-3.0",
+  "repository": "",
+  "bugs": "",
+  "maintainers": [{ "name": "inkvolcano" }],
+  "runtime": {
+    "type": "node22",
+    "api": "nodejs-ipc",
+    "apiVersion": "1.13.6",
+    "entrypoint": "../main.js"
+  },
+  "manufacturer": "DmxLicht",
+  "products": ["DMX lighting control"],
+  "keywords": ["DMX", "Lighting", "uDMX", "Art-Net", "Scenes"],
+  "legacyIds": [],
+  "isPrerelease": false
+}

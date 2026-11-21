@@ -1,0 +1,10 @@
+{
+  "name": "dmxlicht",
+  "version": "2.1.6",
+  "license": "GPL-3.0",
+  "type": "commonjs",
+  "main": "main.js",
+  "dependencies": {
+    "@companion-module/base": "1.13.6"
+  }
+}

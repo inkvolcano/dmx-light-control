@@ -1,0 +1,518 @@
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { api, type EffectInfo, type EffectSettings, type SceneInfo, type Timeline, type TimelineClip, type TimelineTrack } from "../api";
+import { ColorInput, contrast } from "../components/ColorPicker";
+import { Icon } from "../components/Icon";
+import { TemplatesDialog } from "../components/TemplatesDialog";
+import { useT } from "../i18n";
+import { useLive, useShow } from "../store";
+
+const uid = () => Math.random().toString(16).slice(2, 10);
+const fmt = (ms: number) => {
+  const s = Math.max(0, ms) / 1000;
+  return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+};
+
+type Drag =
+  | { kind: "move"; clipId: string; trackId: string; startX: number; origStart: number; origTrack: string; moved: boolean }
+  | { kind: "resize-l" | "resize-r"; clipId: string; trackId: string; startX: number; origStart: number; origLen: number }
+  | { kind: "palette"; item: { type: "scene"; scene: SceneInfo } | { type: "effect"; fx: EffectInfo; chase?: { id: string; name: string } }; x: number; y: number }
+  | { kind: "seek" }
+  | { kind: "flag"; which: "start" | "end" }
+  | { kind: "marker"; id: string; startX: number; orig: number; moved: boolean };
+
+export function TimelinePage() {
+  const t = useT();
+  const { full, boot } = useShow();
+  const { timeline: live } = useLive();
+  const server = full!.timelines;
+  const [currentId, setCurrentId] = useState<string | null>(() => server[0]?.id ?? null);
+  const [tl, setTl] = useState<Timeline | null>(null);
+  const [templates, setTemplates] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [pxPerSec, setPxPerSec] = useState(40);
+  const [peaks, setPeaks] = useState<number[] | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const [query, setQuery] = useState("");
+  const [uploading, setUploading] = useState<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef(false);
+  const saveSeq = useRef(0);
+  const lanesRef = useRef<HTMLDivElement>(null);
+
+  // follow the server copy unless we have unsaved edits
+  useEffect(() => {
+    if (!currentId && server[0]) setCurrentId(server[0].id);
+    const s = server.find((x) => x.id === currentId) ?? null;
+    if (!pending.current) setTl(s ? structuredClone(s) : null);
+  }, [server, currentId]);
+
+  useEffect(() => {
+    setPeaks(null);
+    if (!tl?.audioFile) return;
+    fetch("api/audio/peaks?file=" + encodeURIComponent(tl.audioFile)).then((r) => r.json()).then((d) => setPeaks(d.peaks)).catch(() => {});
+  }, [tl?.audioFile]);
+
+  const save = (next: Timeline, now = false) => {
+    setTl(next);
+    pending.current = true;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const seq = ++saveSeq.current;
+    saveTimer.current = setTimeout(async () => {
+      saveTimer.current = null;
+      try { await api.saveTimeline(next); }
+      catch { /* e.g. locked: follow the server again */ }
+      // only the newest edit releases "pending": an older save finishing must not drop newer edits
+      finally { if (seq === saveSeq.current) pending.current = false; }
+    }, now ? 0 : 350);
+  };
+
+  const create = async () => {
+    const n: Timeline = {
+      id: uid(), name: t("tl.new", { n: server.length + 1 }), lengthMs: 60000, bpm: 120, snap: true, loop: false, audioFile: null,
+      tracks: [
+        { id: uid(), name: t("tl.scenes"), kind: "scenes", target: "*", clips: [] },
+        { id: uid(), name: t("tl.effects"), kind: "effects", target: "*", clips: [] },
+      ],
+    };
+    await api.saveTimeline(n);
+    setCurrentId(n.id);
+  };
+
+  const scenes = full!.scenes;
+  const effects = boot!.effects;
+  const fxName = (e?: EffectInfo) => (e ? t("fxname." + e.key, undefined, e.name) : "?");
+  const pxPerMs = pxPerSec / 1000;
+  const beatMs = tl ? 60000 / tl.bpm : 500;
+  const snap = (ms: number) => (tl?.snap ? Math.round(ms / beatMs) * beatMs : Math.round(ms / 10) * 10);
+  const isMine = live.id && tl && live.id === tl.id;
+  const playhead = isMine ? live.positionMs : tl?.startMs ?? 0;
+  const waiting = isMine && live.waiting != null;
+  const markers = tl?.markers ?? [];
+  const setMarkers = (m: typeof markers) => tl && save({ ...tl, markers: m.sort((a, b) => a.atMs - b.atMs) });
+
+  // keyboard: space = play/pause, Enter = GO, Home = stop, arrows = previous/next point
+  useEffect(() => {
+    if (!tl) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement || e.ctrlKey || e.metaKey) return;
+      if (e.code === "Space") { e.preventDefault(); if (isMine && live.playing) api.pauseTimeline(); else api.playTimeline(tl.id); }
+      else if (e.key === "Enter") { e.preventDefault(); api.goTimeline(tl.id); }
+      else if (e.key === "Home") { e.preventDefault(); api.stopTimeline(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); api.prevTimeline(tl.id); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); api.nextTimeline(tl.id); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tl?.id, isMine, live.playing]);
+  const findClip = (id: string | null) => tl?.tracks.flatMap((k) => k.clips.map((c) => ({ track: k, clip: c }))).find((x) => x.clip.id === id);
+  const sel = findClip(selected);
+
+  const updateClip = (clipId: string, change: Partial<TimelineClip>, toTrack?: string) => {
+    if (!tl) return;
+    const found = findClip(clipId);
+    if (!found) return;
+    const clip = { ...found.clip, ...change };
+    const tracks = tl.tracks.map((k) => {
+      let clips = k.clips.filter((c) => c.id !== clipId);
+      if (k.id === (toTrack ?? found.track.id)) clips = [...clips, clip].sort((a, b) => a.startMs - b.startMs);
+      return { ...k, clips };
+    });
+    save({ ...tl, tracks });
+  };
+
+  const addClip = (trackId: string, startMs: number, item: Extract<Drag, { kind: "palette" }>["item"]) => {
+    if (!tl) return;
+    const track = tl.tracks.find((k) => k.id === trackId);
+    if (!track) return;
+    const len = beatMs * 8;
+    let clip: TimelineClip | null = null;
+    if (item.type === "scene" && track.kind === "scenes")
+      clip = { id: uid(), startMs, lengthMs: len, kind: "scene", sceneId: item.scene.id, effect: null, fadeMs: -1 };
+    if (item.type === "effect" && track.kind === "effects")
+      clip = { id: uid(), startMs, lengthMs: len, kind: "effect", sceneId: null, effect: { ...full!.state.effect, effectIndex: item.fx.index, chaseId: item.chase?.id ?? null, screenSync: false }, fadeMs: -1 };
+    if (!clip) return;
+    const lengthMs = Math.max(tl.lengthMs, startMs + len);
+    save({ ...tl, lengthMs, tracks: tl.tracks.map((k) => (k.id === trackId ? { ...k, clips: [...k.clips, clip!].sort((a, b) => a.startMs - b.startMs) } : k)) });
+    setSelected(clip.id);
+  };
+
+  // ---------- pointer handling (one drag at a time) ----------
+  const laneX = (clientX: number) => {
+    const el = lanesRef.current!;
+    return clientX - el.getBoundingClientRect().left + el.scrollLeft - 160; // 160 = track header width
+  };
+  const trackAt = (clientX: number, clientY: number) =>
+    (document.elementsFromPoint(clientX, clientY).find((e) => (e as HTMLElement).dataset?.track) as HTMLElement | undefined)?.dataset.track;
+
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      if (!tl) return;
+      if (drag.kind === "palette") setDrag({ ...drag, x: e.clientX, y: e.clientY });
+      else if (drag.kind === "seek") api.seekTimeline(Math.max(0, laneX(e.clientX) / pxPerMs));
+      else if (drag.kind === "flag") {
+        const ms = Math.max(0, Math.min(tl.lengthMs, snap(laneX(e.clientX) / pxPerMs)));
+        if (drag.which === "start") save({ ...tl, startMs: Math.min(ms, (tl.endMs ?? tl.lengthMs) - beatMs / 2) });
+        else save({ ...tl, endMs: Math.max(ms, (tl.startMs ?? 0) + beatMs / 2) });
+      }
+      else if (drag.kind === "marker") {
+        if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
+        drag.moved = true;
+        const at = Math.max(0, Math.min(tl.lengthMs, snap(drag.orig + (e.clientX - drag.startX) / pxPerMs)));
+        setMarkers(markers.map((m) => (m.id === drag.id ? { ...m, atMs: at } : m)));
+      }
+      else if (drag.kind === "move") {
+        const dx = (e.clientX - drag.startX) / pxPerMs;
+        if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
+        drag.moved = true;
+        const over = trackAt(e.clientX, e.clientY);
+        const target = tl.tracks.find((k) => k.id === over);
+        const origKind = tl.tracks.find((k) => k.id === drag.origTrack)?.kind;
+        const toTrack = target && target.kind === origKind ? target.id : drag.trackId;
+        updateClip(drag.clipId, { startMs: Math.max(0, snap(drag.origStart + dx)) }, toTrack);
+        if (toTrack !== drag.trackId) setDrag({ ...drag, trackId: toTrack });
+      } else {
+        const dx = (e.clientX - drag.startX) / pxPerMs;
+        if (drag.kind === "resize-r") updateClip(drag.clipId, { lengthMs: Math.max(beatMs / 2, snap(drag.origStart + drag.origLen + dx) - drag.origStart) });
+        else {
+          const start = Math.min(drag.origStart + drag.origLen - beatMs / 2, Math.max(0, snap(drag.origStart + dx)));
+          updateClip(drag.clipId, { startMs: start, lengthMs: drag.origStart + drag.origLen - start });
+        }
+      }
+    };
+    const up = (e: PointerEvent) => {
+      if (drag.kind === "marker" && !drag.moved) {
+        const m = markers.find((x) => x.id === drag.id);
+        if (m) { if (isMine) api.seekTimeline(m.atMs); else api.playTimeline(tl!.id, m.atMs).then(() => api.pauseTimeline()); }
+      }
+      if (drag.kind === "palette") {
+        const track = trackAt(e.clientX, e.clientY);
+        if (track) addClip(track, Math.max(0, snap(laneX(e.clientX) / pxPerMs)), drag.item);
+      }
+      setDrag(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+  });
+
+  const filteredFx = useMemo(() => effects.filter((e) => !query || fxName(e).toLowerCase().includes(query.toLowerCase())), [effects, query, full?.settings.language]);
+
+  if (!tl) {
+    return (
+      <div className="empty">
+        <Icon name="timeline" size={40} />
+        <div>{t("tl.empty")}</div>
+        <button className="btn primary" onClick={create}><Icon name="plus" /> {t("tl.create")}</button>
+      </div>
+    );
+  }
+
+  const width = tl.lengthMs * pxPerMs;
+  const beatPx = beatMs * pxPerMs;
+  const groups = full!.groups;
+
+  const upload = async (file: File) => {
+    setUploading(file.name);
+    try {
+      const r = await api.uploadAudio(file);
+      save({ ...tl, audioFile: r.file, lengthMs: Math.max(tl.lengthMs, Math.ceil(r.lengthMs / 1000) * 1000) }, true);
+    } catch (e) { alert(String(e)); }
+    setUploading(null);
+  };
+
+  return (
+    <div className="tl-page">
+      <div className="page-head">
+        <h1>{t("nav.timeline")}</h1>
+        <select className="input" value={tl.id} onChange={(e) => { pending.current = false; setCurrentId(e.target.value); setSelected(null); }}>
+          {server.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+        <input className="input" style={{ width: 160 }} value={tl.name} onChange={(e) => save({ ...tl, name: e.target.value })} />
+        <button className="btn sm" onClick={create}><Icon name="plus" /> {t("tl.create")}</button>
+        <button className="btn sm ghost danger icon-btn" title={t("scenes.delete")} onClick={() => { if (confirm(t("tl.confirmDelete", { name: tl.name }))) { api.removeTimeline(tl.id); setCurrentId(null); } }}><Icon name="trash" /></button>
+      </div>
+
+      <div className="tl-transport card">
+        <button className="btn lg icon-btn" style={{ width: 44 }} title={t("tl.prev") + " (←)"} onClick={() => api.prevTimeline(tl.id)}>|◀</button>
+        {waiting
+          ? <button className="btn lg go-btn" onClick={() => api.goTimeline(tl.id)}><Icon name="play" /> GO{live.waiting ? ` · ${live.waiting}` : ""}</button>
+          : isMine && live.playing
+            ? <button className="btn lg" onClick={() => api.pauseTimeline()}><Icon name="pause" /> {t("tl.pause")}</button>
+            : <button className="btn lg primary" onClick={() => api.playTimeline(tl.id)}><Icon name="play" /> {t("tl.play")}</button>}
+        <button className="btn lg" onClick={() => api.stopTimeline()} disabled={!isMine} title="Home"><Icon name="stop" /> {t("tl.stop")}</button>
+        <button className="btn lg icon-btn" style={{ width: 44 }} title={t("tl.next") + " (→)"} onClick={() => api.nextTimeline(tl.id)}>▶|</button>
+        <span className="tl-time mono">{fmt(playhead)} <span className="muted">/ {fmt(tl.lengthMs)}</span></span>
+        <label className="check"><input type="checkbox" checked={tl.loop} onChange={(e) => save({ ...tl, loop: e.target.checked })} /><span className="box" /> {t("tl.loop")}</label>
+        <label className="row" style={{ gap: 6 }}><span className="muted">BPM</span>
+          <input className="input num" type="number" min={30} max={300} value={tl.bpm} onChange={(e) => save({ ...tl, bpm: Math.max(30, Math.min(300, +e.target.value || 120)) })} />
+        </label>
+        <label className="check"><input type="checkbox" checked={tl.snap} onChange={(e) => save({ ...tl, snap: e.target.checked })} /><span className="box" /> {t("tl.snap")}</label>
+        <label className="row" style={{ gap: 6 }}><span className="muted">{t("tl.length")}</span>
+          <input className="input num" type="number" min={1} value={Math.round(tl.lengthMs / 1000)} onChange={(e) => save({ ...tl, lengthMs: Math.max(1000, (+e.target.value || 60) * 1000) })} />
+          <span className="muted">s</span>
+        </label>
+        <div style={{ flex: 1 }} />
+        <label className="btn sm" title={t("tl.audioHint")}>
+          <Icon name="music" /> {uploading ? t("tl.uploading") : tl.audioFile ? tl.audioFile : t("tl.addAudio")}
+          <input type="file" accept=".mp3,.wav,.m4a,.aac,.wma,.flac,audio/*" style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+        </label>
+        {tl.audioFile && <button className="btn sm ghost icon-btn" title={t("tl.removeAudio")} onClick={() => save({ ...tl, audioFile: null }, true)}>×</button>}
+        <div className="tl-points">
+          <button className="btn sm" title={t("tl.setStartHint")} onClick={() => save({ ...tl, startMs: Math.min(snap(playhead), (tl.endMs ?? tl.lengthMs) - beatMs / 2) })}><span className="flag start" /> {t("tl.setStart")}</button>
+          <button className="btn sm" title={t("tl.setEndHint")} onClick={() => save({ ...tl, endMs: Math.max(snap(playhead), (tl.startMs ?? 0) + beatMs / 2) })}><span className="flag end" /> {t("tl.setEnd")}</button>
+          <button className="btn sm" title={t("tl.waitHint")} onClick={() => setMarkers([...markers, { id: Math.random().toString(16).slice(2, 10), atMs: snap(playhead), name: t("tl.waitName", { n: markers.filter((m) => m.kind === "wait").length + 1 }), kind: "wait" }])}><span className="mk wait" /> {t("tl.addWait")}</button>
+          <button className="btn sm" title={t("tl.cueHint")} onClick={() => setMarkers([...markers, { id: Math.random().toString(16).slice(2, 10), atMs: snap(playhead), name: t("tl.cueName", { n: markers.filter((m) => m.kind === "cue").length + 1 }), kind: "cue" }])}><span className="mk cue" /> {t("tl.addCue")}</button>
+          {((tl.startMs ?? 0) > 0 || tl.endMs != null) && <button className="btn sm ghost" onClick={() => save({ ...tl, startMs: 0, endMs: null })}>{t("tl.clearRegion")}</button>}
+        </div>
+        <label className="row" style={{ gap: 6 }} title="Zoom"><Icon name="search" />
+          <input type="range" min={8} max={200} value={pxPerSec} onChange={(e) => setPxPerSec(+e.target.value)} style={{ width: 110 }} />
+        </label>
+      </div>
+
+      <div className="tl-body">
+        <div className="tl-palette card">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h3>{t("scenes.title")}</h3>
+            <button className="btn sm ghost" onClick={() => setTemplates(true)} title={t("tpl.hint")}><Icon name="sparkles" /> {t("tpl.button")}</button>
+          </div>
+          {scenes.length === 0 && <p className="hint">{t("tl.noScenes")}</p>}
+          {templates && <TemplatesDialog onClose={() => setTemplates(false)} />}
+          <div className="tl-items">
+            {scenes.map((s) => (
+              <div key={s.id} className="tl-item" style={{ borderLeftColor: s.color }}
+                onPointerDown={(e) => { e.preventDefault(); setDrag({ kind: "palette", item: { type: "scene", scene: s }, x: e.clientX, y: e.clientY }); }}>
+                {s.name}
+              </div>
+            ))}
+          </div>
+          <h3 style={{ marginTop: 14 }}>{t("nav.effects")}</h3>
+          <input className="input" placeholder={t("fx.search")} value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: "100%", marginBottom: 8 }} />
+          <div className="tl-items scroll">
+            {(full!.state.chases ?? []).filter((c) => !query || c.name.toLowerCase().includes(query.toLowerCase())).map((c) => (
+              <div key={c.id} className="tl-item fx own"
+                onPointerDown={(ev) => { ev.preventDefault(); setDrag({ kind: "palette", item: { type: "effect", fx: effects[0], chase: { id: c.id, name: c.name } }, x: ev.clientX, y: ev.clientY }); }}>
+                ★ {c.name}
+              </div>
+            ))}
+            {filteredFx.map((e) => (
+              <div key={e.key} className="tl-item fx"
+                onPointerDown={(ev) => { ev.preventDefault(); setDrag({ kind: "palette", item: { type: "effect", fx: e }, x: ev.clientX, y: ev.clientY }); }}>
+                {fxName(e)}
+              </div>
+            ))}
+          </div>
+          <p className="hint" style={{ marginTop: 8 }}>{t("tl.dragHint")}</p>
+        </div>
+
+        <div className="tl-main card">
+          <div className="tl-lanes" ref={lanesRef}>
+            <div style={{ width: width + 160, position: "relative" }}>
+              <div className="tl-ruler" onPointerDown={(e) => { api.seekTimeline(Math.max(0, laneX(e.clientX) / pxPerMs)); setDrag({ kind: "seek" }); }}>
+                <div className="tl-head sticky">{t("tl.time")}</div>
+                <div className="tl-ruler-lane" style={{ width, ["--beat" as string]: beatPx + "px" }}>
+                  <span className="tl-flag start" style={{ left: (tl.startMs ?? 0) * pxPerMs }} title={t("tl.setStart")}
+                    onPointerDown={(e) => { e.stopPropagation(); setDrag({ kind: "flag", which: "start" }); }} />
+                  <span className="tl-flag end" style={{ left: (tl.endMs ?? tl.lengthMs) * pxPerMs }} title={t("tl.setEnd")}
+                    onPointerDown={(e) => { e.stopPropagation(); setDrag({ kind: "flag", which: "end" }); }} />
+                  {markers.map((m) => (
+                    <span key={m.id} className={"tl-marker " + m.kind + (isMine && live.waiting != null && Math.abs(live.positionMs - m.atMs) < 30 && m.kind === "wait" ? " waiting" : "")}
+                      style={{ left: m.atMs * pxPerMs }} title={(m.name ?? "") + " · " + t(m.kind === "wait" ? "tl.waitPoint" : "tl.cuePoint") + " · " + t("tl.markerHint")}
+                      onPointerDown={(e) => { e.stopPropagation(); setDrag({ kind: "marker", id: m.id, startX: e.clientX, orig: m.atMs, moved: false }); }}
+                      onDoubleClick={(e) => { e.stopPropagation(); const n = prompt(t("scenes.name"), m.name ?? ""); if (n != null) setMarkers(markers.map((x) => (x.id === m.id ? { ...x, name: n } : x))); }}
+                      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setMarkers(markers.filter((x) => x.id !== m.id)); }}>
+                      <i>{m.name}</i>
+                    </span>
+                  ))}
+                  {Array.from({ length: Math.floor(tl.lengthMs / 1000 / tickEvery(pxPerSec)) + 1 }, (_, i) => {
+                    const sec = i * tickEvery(pxPerSec);
+                    return <span key={i} style={{ left: sec * pxPerSec }}>{fmt(sec * 1000).replace(".0", "")}</span>;
+                  })}
+                </div>
+              </div>
+              {tl.audioFile && (
+                <div className="tl-row wave-row">
+                  <div className="tl-head sticky"><Icon name="music" /> <span className="ellipsis">{tl.audioFile}</span></div>
+                  <Waveform peaks={peaks} width={width} />
+                </div>
+              )}
+              {tl.tracks.map((k) => (
+                <TrackRow key={k.id} track={k} width={width} beatPx={beatPx} pxPerMs={pxPerMs} scenes={scenes} effects={effects}
+                  groups={groups} selected={selected} fxName={fxName}
+                  dropOk={drag?.kind === "palette" && ((drag.item.type === "scene") === (k.kind === "scenes"))}
+                  onSelect={setSelected}
+                  onTrack={(change) => save({ ...tl, tracks: tl.tracks.map((x) => (x.id === k.id ? { ...x, ...change } : x)) })}
+                  onRemoveTrack={() => save({ ...tl, tracks: tl.tracks.filter((x) => x.id !== k.id) })}
+                  onClipDown={(e, c, part) => {
+                    e.stopPropagation(); e.preventDefault();
+                    setSelected(c.id);
+                    if (part === "body") setDrag({ kind: "move", clipId: c.id, trackId: k.id, origTrack: k.id, startX: e.clientX, origStart: c.startMs, moved: false });
+                    else setDrag({ kind: part === "l" ? "resize-l" : "resize-r", clipId: c.id, trackId: k.id, startX: e.clientX, origStart: c.startMs, origLen: c.lengthMs });
+                  }} />
+              ))}
+              {(tl.startMs ?? 0) > 0 && <div className="tl-outside" style={{ left: 160, width: (tl.startMs ?? 0) * pxPerMs }} />}
+              {tl.endMs != null && <div className="tl-outside" style={{ left: 160 + tl.endMs * pxPerMs, width: Math.max(0, (tl.lengthMs - tl.endMs) * pxPerMs) }} />}
+              {markers.filter((m) => m.kind === "wait").map((m) => <div key={m.id} className="tl-waitline" style={{ left: 160 + m.atMs * pxPerMs }} />)}
+              <div className="tl-playhead" style={{ left: 160 + playhead * pxPerMs }} />
+            </div>
+          </div>
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn sm" onClick={() => save({ ...tl, tracks: [...tl.tracks, { id: uid(), name: t("tl.effects"), kind: "effects", target: "*", clips: [] }] })}>
+              <Icon name="plus" /> {t("tl.addEffectTrack")}
+            </button>
+            <button className="btn sm" onClick={() => save({ ...tl, tracks: [...tl.tracks, { id: uid(), name: t("tl.scenes"), kind: "scenes", target: "*", clips: [] }] })}>
+              <Icon name="plus" /> {t("tl.addSceneTrack")}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {sel && (
+        <ClipInspector clip={sel.clip} track={sel.track} scenes={scenes} effects={effects} fxName={fxName}
+          onChange={(c) => updateClip(sel.clip.id, c)}
+          onDelete={() => { save({ ...tl, tracks: tl.tracks.map((k) => ({ ...k, clips: k.clips.filter((c) => c.id !== sel.clip.id) })) }); setSelected(null); }} />
+      )}
+
+      {drag?.kind === "palette" && (
+        <div className="drag-overlay" style={{ position: "fixed", left: drag.x + 10, top: drag.y + 10, pointerEvents: "none", zIndex: 100 }}>
+          + {drag.item.type === "scene" ? drag.item.scene.name : drag.item.chase?.name ?? fxName(drag.item.fx)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function tickEvery(pxPerSec: number) {
+  for (const s of [1, 2, 5, 10, 15, 30, 60]) if (s * pxPerSec >= 70) return s;
+  return 120;
+}
+
+function Waveform({ peaks, width }: { peaks: number[] | null; width: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const w = Math.max(1, Math.round(width)), h = 48;
+    c.width = w; c.height = h;
+    const g = c.getContext("2d")!;
+    g.clearRect(0, 0, w, h);
+    if (!peaks) return;
+    g.fillStyle = "rgba(252,178,78,0.55)";
+    for (let x = 0; x < w; x++) {
+      const v = peaks[Math.floor((x / w) * peaks.length)] ?? 0;
+      const bar = Math.max(1, v * (h - 4));
+      g.fillRect(x, (h - bar) / 2, 1, bar);
+    }
+  }, [peaks, width]);
+  return <canvas ref={ref} className="tl-wave" style={{ width }} />;
+}
+
+function TrackRow({ track, width, beatPx, pxPerMs, scenes, effects, groups, selected, dropOk, fxName, onSelect, onTrack, onRemoveTrack, onClipDown }: {
+  track: TimelineTrack; width: number; beatPx: number; pxPerMs: number; scenes: SceneInfo[]; effects: EffectInfo[];
+  groups: { id: string; name: string }[]; selected: string | null; dropOk: boolean; fxName: (e?: EffectInfo) => string;
+  onSelect: (id: string | null) => void; onTrack: (c: Partial<TimelineTrack>) => void; onRemoveTrack: () => void;
+  onClipDown: (e: RPointerEvent, c: TimelineClip, part: "body" | "l" | "r") => void;
+}) {
+  const chases = useShow().full?.state.chases ?? [];
+  const t = useT();
+  return (
+    <div className={"tl-row" + (dropOk ? " drop-ok" : "")}>
+      <div className="tl-head sticky">
+        <input className="tl-name" value={track.name} onChange={(e) => onTrack({ name: e.target.value })} />
+        {track.kind === "effects" ? (
+          <select className="tl-target" value={track.target} onChange={(e) => onTrack({ target: e.target.value })}>
+            <option value="*">{t("fx.allLamps")}</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        ) : <span className="tl-kind">{t("tl.sceneTrack")}</span>}
+        <button className="tl-del" title={t("scenes.delete")} onClick={onRemoveTrack}>×</button>
+      </div>
+      <div className="tl-lane" data-track={track.id} style={{ width, ["--beat" as string]: beatPx + "px" }}
+        onPointerDown={() => onSelect(null)}>
+        {track.clips.map((c) => {
+          const scene = c.kind === "scene" ? scenes.find((s) => s.id === c.sceneId) : undefined;
+          const fx = c.kind === "effect" && c.effect ? effects[c.effect.effectIndex] : undefined;
+          const bg = scene ? scene.color : `linear-gradient(90deg, ${c.effect?.colorA ?? "#555"}, ${c.effect?.colorB ?? "#333"})`;
+          const label = scene ? scene.name : c.effect?.chaseId ? "★ " + (chases.find((x) => x.id === c.effect!.chaseId)?.name ?? "?") : fxName(fx);
+          return (
+            <div key={c.id} className={"tl-clip" + (selected === c.id ? " selected" : "")}
+              style={{ left: c.startMs * pxPerMs, width: Math.max(6, c.lengthMs * pxPerMs), background: bg, color: scene ? contrast(scene.color) : "#fff" }}
+              onPointerDown={(e) => onClipDown(e, c, "body")} title={label}>
+              <span className="grip l" onPointerDown={(e) => onClipDown(e, c, "l")} />
+              <span className="tl-clip-label">{label}</span>
+              <span className="grip r" onPointerDown={(e) => onClipDown(e, c, "r")} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ClipInspector({ clip, track, scenes, effects, fxName, onChange, onDelete }: {
+  clip: TimelineClip; track: TimelineTrack; scenes: SceneInfo[]; effects: EffectInfo[]; fxName: (e?: EffectInfo) => string;
+  onChange: (c: Partial<TimelineClip>) => void; onDelete: () => void;
+}) {
+  const t = useT();
+  const fx = clip.effect;
+  const setFx = (c: Partial<EffectSettings>) => onChange({ effect: { ...fx!, ...c } });
+  const chases = useShow().full?.state.chases ?? [];
+  return (
+    <div className="card tl-inspector">
+      <div className="row">
+        <h2 style={{ marginRight: 8 }}>{clip.kind === "scene" ? t("tl.sceneClip") : t("tl.effectClip")}</h2>
+        <span className="muted">{track.name}</span>
+        <div style={{ flex: 1 }} />
+        <button className="btn sm ghost danger" onClick={onDelete}><Icon name="trash" /> {t("scenes.delete")}</button>
+      </div>
+      <div className="row" style={{ marginTop: 10, gap: 14, alignItems: "flex-end" }}>
+        <label className="field">{t("tl.start")}
+          <input className="input num" type="number" step={0.1} min={0} value={(clip.startMs / 1000).toFixed(1)} onChange={(e) => onChange({ startMs: Math.max(0, +e.target.value * 1000) })} />
+        </label>
+        <label className="field">{t("tl.length")}
+          <input className="input num" type="number" step={0.1} min={0.1} value={(clip.lengthMs / 1000).toFixed(1)} onChange={(e) => onChange({ lengthMs: Math.max(50, +e.target.value * 1000) })} />
+        </label>
+        {clip.kind === "scene" ? (
+          <>
+            <label className="field">{t("tl.scene")}
+              <select className="input" value={clip.sceneId ?? ""} onChange={(e) => onChange({ sceneId: e.target.value })}>
+                {scenes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            <label className="field">{t("scenes.fade")}
+              <input className="input num" type="number" step={0.1} min={-1} value={clip.fadeMs < 0 ? "" : clip.fadeMs / 1000}
+                placeholder={t("tl.sceneFade")} onChange={(e) => onChange({ fadeMs: e.target.value === "" ? -1 : Math.max(0, +e.target.value * 1000) })} />
+            </label>
+          </>
+        ) : fx && (
+          <>
+            <label className="field">{t("tl.effect")}
+              <select className="input" value={fx.chaseId ? "c:" + fx.chaseId : String(fx.effectIndex)}
+                onChange={(e) => e.target.value.startsWith("c:") ? setFx({ chaseId: e.target.value.slice(2), screenSync: false }) : setFx({ effectIndex: +e.target.value, chaseId: null, screenSync: false })}>
+                {chases.length > 0 && (
+                  <optgroup label={t("fxcat.own")}>
+                    {chases.map((c) => <option key={c.id} value={"c:" + c.id}>★ {c.name}</option>)}
+                  </optgroup>
+                )}
+                <optgroup label={t("nav.effects")}>
+                  {effects.map((e) => <option key={e.index} value={e.index}>{fxName(e)}</option>)}
+                </optgroup>
+              </select>
+            </label>
+            <label className="field">{t("fx.colorA")}
+              <span className="colorbtn" style={{ background: fx.colorA, width: 90 }}><ColorInput value={fx.colorA} onPick={(h) => setFx({ colorA: h })} /></span>
+            </label>
+            <label className="field">{t("fx.colorB")}
+              <span className="colorbtn" style={{ background: fx.colorB, width: 90 }}><ColorInput value={fx.colorB} onPick={(h) => setFx({ colorB: h })} /></span>
+            </label>
+            <label className="field">{t("fx.step")} (ms)
+              <input className="input num" type="number" min={40} max={10000} step={10} value={fx.stepMs} onChange={(e) => setFx({ stepMs: Math.max(40, +e.target.value) })} />
+            </label>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
