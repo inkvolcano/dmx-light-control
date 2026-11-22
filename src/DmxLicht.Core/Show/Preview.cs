@@ -1,3 +1,4 @@
+using DmxLicht.Core.Effects;
 using DmxLicht.Core.Fixtures;
 
 namespace DmxLicht.Core.Show;
@@ -5,6 +6,33 @@ namespace DmxLicht.Core.Show;
 /// <summary>Reads a built frame back into on-screen colours per head, so the UI shows what the lamps do.</summary>
 public static class Preview
 {
+    /// <summary>
+    /// A short loop of an effect as on-screen colours, for the moving example on an effect tile: per frame
+    /// "#RRGGBB" per lamp. Sound effects get a made-up song (a kick on every beat at 120 BPM) so they move too.
+    /// </summary>
+    public static string[][] EffectFrames(EffectSettings s, int lamps, int frames, int frameMs)
+    {
+        lamps = Math.Clamp(lamps, 1, 16); frames = Math.Clamp(frames, 1, 200); frameMs = Math.Clamp(frameMs, 10, 1000);
+        var result = new string[frames][];
+        for (int f = 0; f < frames; f++)
+        {
+            long ms = (long)f * frameMs;
+            double beat = ms / 500.0, phase = beat - Math.Floor(beat);
+            double kick = Math.Exp(-phase * 6), wave = 0.5 + 0.5 * Math.Sin(ms / 700.0);
+            var audio = new AudioFrame(0.35 + 0.5 * kick, kick, 0.3 + 0.4 * wave, 0.2 + 0.5 * (1 - wave), beat, phase < 0.05 && (long)beat % 8 == 0);
+            LampOutput[] o = EffectLibrary.Render(s, false, ms, lamps, audio);
+            var row = new string[o.Length];
+            for (int i = 0; i < o.Length; i++)
+            {
+                Light c = FrameBuilder.FoldAll(o[i].Color);
+                double lv = Math.Clamp(o[i].Level, 0, 1);
+                row[i] = "#" + Math.Clamp((int)Math.Round(c.R * lv), 0, 255).ToString("X2") + Math.Clamp((int)Math.Round(c.G * lv), 0, 255).ToString("X2") + Math.Clamp((int)Math.Round(c.B * lv), 0, 255).ToString("X2");
+            }
+            result[f] = row;
+        }
+        return result;
+    }
+
     /// <summary>"#RRGGBB" per head, in <see cref="Rig.Heads"/> order.</summary>
     public static string[] HeadColors(Rig rig, byte[] frame)
     {

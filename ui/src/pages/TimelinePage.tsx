@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { api, type EffectInfo, type EffectSettings, type SceneInfo, type Timeline, type TimelineClip, type TimelineTrack } from "../api";
 import { ColorInput, contrast } from "../components/ColorPicker";
 import { Icon } from "../components/Icon";
-import { TemplatesDialog } from "../components/TemplatesDialog";
+import { LiveTools, type DragItem, type DragStart } from "../components/LiveTools";
 import { useT } from "../i18n";
-import { useLive, useShow } from "../store";
+import { onLinux, useLive, useShow } from "../store";
+import { toast } from "../components/Toast";
 
 const uid = () => Math.random().toString(16).slice(2, 10);
 const fmt = (ms: number) => {
@@ -15,24 +16,42 @@ const fmt = (ms: number) => {
 type Drag =
   | { kind: "move"; clipId: string; trackId: string; startX: number; origStart: number; origTrack: string; moved: boolean }
   | { kind: "resize-l" | "resize-r"; clipId: string; trackId: string; startX: number; origStart: number; origLen: number }
-  | { kind: "palette"; item: { type: "scene"; scene: SceneInfo } | { type: "effect"; fx: EffectInfo; chase?: { id: string; name: string } }; x: number; y: number }
+  | { kind: "palette"; item: DragItem; x: number; y: number }
   | { kind: "seek" }
   | { kind: "flag"; which: "start" | "end" }
   | { kind: "marker"; id: string; startX: number; orig: number; moved: boolean };
 
+/** Starts dragging a colour, effect or preset from the tools towards the timeline (wherever it is shown). */
+export const startTimelineDrag: DragStart = (item, e) => {
+  e.preventDefault();
+  window.dispatchEvent(new CustomEvent("dmx-tl-drag", { detail: { item, x: e.clientX, y: e.clientY } }));
+};
+
+/** The timeline page (old links): the editor with the tools under it. */
 export function TimelinePage() {
+  return (
+    <div className="stack" style={{ gap: 16 }}>
+      <TimelineEditor />
+      <LiveTools selected={[]} onDrag={startTimelineDrag} storageKey="tlTab" />
+    </div>
+  );
+}
+
+/**
+ * The timeline: transport, tracks and clips. Colours, effects and presets are dragged in from the tools
+ * (Kleuren / Effecten / Presets) shown under it; `embedded` = inside Bediening (no page title).
+ */
+export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
   const t = useT();
   const { full, boot } = useShow();
   const { timeline: live } = useLive();
   const server = full!.timelines;
   const [currentId, setCurrentId] = useState<string | null>(() => server[0]?.id ?? null);
   const [tl, setTl] = useState<Timeline | null>(null);
-  const [templates, setTemplates] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [pxPerSec, setPxPerSec] = useState(40);
   const [peaks, setPeaks] = useState<number[] | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
-  const [query, setQuery] = useState("");
   const [uploading, setUploading] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef(false);
@@ -121,6 +140,7 @@ export function TimelinePage() {
     save({ ...tl, tracks });
   };
 
+  const solidIndex = effects.findIndex((e) => e.key === "all-ab");
   const addClip = (trackId: string, startMs: number, item: Extract<Drag, { kind: "palette" }>["item"]) => {
     if (!tl) return;
     const track = tl.tracks.find((k) => k.id === trackId);
@@ -131,6 +151,10 @@ export function TimelinePage() {
       clip = { id: uid(), startMs, lengthMs: len, kind: "scene", sceneId: item.scene.id, effect: null, fadeMs: -1 };
     if (item.type === "effect" && track.kind === "effects")
       clip = { id: uid(), startMs, lengthMs: len, kind: "effect", sceneId: null, effect: { ...full!.state.effect, effectIndex: item.fx.index, chaseId: item.chase?.id ?? null, screenSync: false }, fadeMs: -1 };
+    // a colour = "all lamps in colour A" with A and B the same: the lamps of the track simply take that colour
+    if (item.type === "color" && track.kind === "effects" && solidIndex >= 0)
+      clip = { id: uid(), startMs, lengthMs: len, kind: "effect", sceneId: null,
+        effect: { ...full!.state.effect, effectIndex: solidIndex, chaseId: null, screenSync: false, colorA: item.hex, colorB: item.hex, colorPerLamp: false }, fadeMs: -1 };
     if (!clip) return;
     const lengthMs = Math.max(tl.lengthMs, startMs + len);
     save({ ...tl, lengthMs, tracks: tl.tracks.map((k) => (k.id === trackId ? { ...k, clips: [...k.clips, clip!].sort((a, b) => a.startMs - b.startMs) } : k)) });
@@ -197,7 +221,12 @@ export function TimelinePage() {
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
   });
 
-  const filteredFx = useMemo(() => effects.filter((e) => !query || fxName(e).toLowerCase().includes(query.toLowerCase())), [effects, query, full?.settings.language]);
+  // a drag started in the tools (they live outside this component)
+  useEffect(() => {
+    const on = (e: Event) => { const d = (e as CustomEvent<{ item: DragItem; x: number; y: number }>).detail; setDrag({ kind: "palette", item: d.item, x: d.x, y: d.y }); };
+    window.addEventListener("dmx-tl-drag", on);
+    return () => window.removeEventListener("dmx-tl-drag", on);
+  }, []);
 
   if (!tl) {
     return (
@@ -225,13 +254,13 @@ export function TimelinePage() {
   return (
     <div className="tl-page">
       <div className="page-head">
-        <h1>{t("nav.timeline")}</h1>
+        {!embedded && <h1>{t("nav.timeline")}</h1>}
         <select className="input" value={tl.id} onChange={(e) => { pending.current = false; setCurrentId(e.target.value); setSelected(null); }}>
           {server.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </select>
         <input className="input" style={{ width: 160 }} value={tl.name} onChange={(e) => save({ ...tl, name: e.target.value })} />
         <button className="btn sm" onClick={create}><Icon name="plus" /> {t("tl.create")}</button>
-        <button className="btn sm ghost danger icon-btn" title={t("scenes.delete")} onClick={() => { if (confirm(t("tl.confirmDelete", { name: tl.name }))) { api.removeTimeline(tl.id); setCurrentId(null); } }}><Icon name="trash" /></button>
+        <button className="btn sm ghost danger icon-btn" title={t("scenes.delete")} onClick={() => { if (confirm(t("tl.confirmDelete", { name: tl.name }))) { api.removeTimeline(tl.id); setCurrentId(null); toast(t("toast.timelineRemoved", { name: tl.name })); } }}><Icon name="trash" /></button>
       </div>
 
       <div className="tl-transport card">
@@ -254,11 +283,12 @@ export function TimelinePage() {
           <span className="muted">s</span>
         </label>
         <div style={{ flex: 1 }} />
+        {onLinux() ? <span className="hint" title={t("linux.noSongs")}><Icon name="music" /> {tl.audioFile ? tl.audioFile + " · " : ""}{t("linux.noSongsShort")}</span> : (
         <label className="btn sm" title={t("tl.audioHint")}>
           <Icon name="music" /> {uploading ? t("tl.uploading") : tl.audioFile ? tl.audioFile : t("tl.addAudio")}
           <input type="file" accept=".mp3,.wav,.m4a,.aac,.wma,.flac,audio/*" style={{ display: "none" }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
-        </label>
+        </label>)}
         {tl.audioFile && <button className="btn sm ghost icon-btn" title={t("tl.removeAudio")} onClick={() => save({ ...tl, audioFile: null }, true)}>×</button>}
         <div className="tl-points">
           <button className="btn sm" title={t("tl.setStartHint")} onClick={() => save({ ...tl, startMs: Math.min(snap(playhead), (tl.endMs ?? tl.lengthMs) - beatMs / 2) })}><span className="flag start" /> {t("tl.setStart")}</button>
@@ -273,40 +303,6 @@ export function TimelinePage() {
       </div>
 
       <div className="tl-body">
-        <div className="tl-palette card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <h3>{t("scenes.title")}</h3>
-            <button className="btn sm ghost" onClick={() => setTemplates(true)} title={t("tpl.hint")}><Icon name="sparkles" /> {t("tpl.button")}</button>
-          </div>
-          {scenes.length === 0 && <p className="hint">{t("tl.noScenes")}</p>}
-          {templates && <TemplatesDialog onClose={() => setTemplates(false)} />}
-          <div className="tl-items">
-            {scenes.map((s) => (
-              <div key={s.id} className="tl-item" style={{ borderLeftColor: s.color }}
-                onPointerDown={(e) => { e.preventDefault(); setDrag({ kind: "palette", item: { type: "scene", scene: s }, x: e.clientX, y: e.clientY }); }}>
-                {s.name}
-              </div>
-            ))}
-          </div>
-          <h3 style={{ marginTop: 14 }}>{t("nav.effects")}</h3>
-          <input className="input" placeholder={t("fx.search")} value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: "100%", marginBottom: 8 }} />
-          <div className="tl-items scroll">
-            {(full!.state.chases ?? []).filter((c) => !query || c.name.toLowerCase().includes(query.toLowerCase())).map((c) => (
-              <div key={c.id} className="tl-item fx own"
-                onPointerDown={(ev) => { ev.preventDefault(); setDrag({ kind: "palette", item: { type: "effect", fx: effects[0], chase: { id: c.id, name: c.name } }, x: ev.clientX, y: ev.clientY }); }}>
-                ★ {c.name}
-              </div>
-            ))}
-            {filteredFx.map((e) => (
-              <div key={e.key} className="tl-item fx"
-                onPointerDown={(ev) => { ev.preventDefault(); setDrag({ kind: "palette", item: { type: "effect", fx: e }, x: ev.clientX, y: ev.clientY }); }}>
-                {fxName(e)}
-              </div>
-            ))}
-          </div>
-          <p className="hint" style={{ marginTop: 8 }}>{t("tl.dragHint")}</p>
-        </div>
-
         <div className="tl-main card">
           <div className="tl-lanes" ref={lanesRef}>
             <div style={{ width: width + 160, position: "relative" }}>
@@ -342,6 +338,7 @@ export function TimelinePage() {
                 <TrackRow key={k.id} track={k} width={width} beatPx={beatPx} pxPerMs={pxPerMs} scenes={scenes} effects={effects}
                   groups={groups} selected={selected} fxName={fxName}
                   dropOk={drag?.kind === "palette" && ((drag.item.type === "scene") === (k.kind === "scenes"))}
+                  solidIndex={solidIndex}
                   onSelect={setSelected}
                   onTrack={(change) => save({ ...tl, tracks: tl.tracks.map((x) => (x.id === k.id ? { ...x, ...change } : x)) })}
                   onRemoveTrack={() => save({ ...tl, tracks: tl.tracks.filter((x) => x.id !== k.id) })}
@@ -377,7 +374,8 @@ export function TimelinePage() {
 
       {drag?.kind === "palette" && (
         <div className="drag-overlay" style={{ position: "fixed", left: drag.x + 10, top: drag.y + 10, pointerEvents: "none", zIndex: 100 }}>
-          + {drag.item.type === "scene" ? drag.item.scene.name : drag.item.chase?.name ?? fxName(drag.item.fx)}
+          {drag.item.type === "color" && <span className="drag-swatch" style={{ background: drag.item.hex }} />}
+          + {drag.item.type === "scene" ? drag.item.scene.name : drag.item.type === "color" ? drag.item.name : drag.item.chase?.name ?? fxName(drag.item.fx)}
         </div>
       )}
     </div>
@@ -409,8 +407,8 @@ function Waveform({ peaks, width }: { peaks: number[] | null; width: number }) {
   return <canvas ref={ref} className="tl-wave" style={{ width }} />;
 }
 
-function TrackRow({ track, width, beatPx, pxPerMs, scenes, effects, groups, selected, dropOk, fxName, onSelect, onTrack, onRemoveTrack, onClipDown }: {
-  track: TimelineTrack; width: number; beatPx: number; pxPerMs: number; scenes: SceneInfo[]; effects: EffectInfo[];
+function TrackRow({ track, width, beatPx, pxPerMs, scenes, effects, groups, selected, dropOk, solidIndex, fxName, onSelect, onTrack, onRemoveTrack, onClipDown }: {
+  track: TimelineTrack; width: number; beatPx: number; pxPerMs: number; scenes: SceneInfo[]; effects: EffectInfo[]; solidIndex: number;
   groups: { id: string; name: string }[]; selected: string | null; dropOk: boolean; fxName: (e?: EffectInfo) => string;
   onSelect: (id: string | null) => void; onTrack: (c: Partial<TimelineTrack>) => void; onRemoveTrack: () => void;
   onClipDown: (e: RPointerEvent, c: TimelineClip, part: "body" | "l" | "r") => void;
@@ -435,7 +433,9 @@ function TrackRow({ track, width, beatPx, pxPerMs, scenes, effects, groups, sele
           const scene = c.kind === "scene" ? scenes.find((s) => s.id === c.sceneId) : undefined;
           const fx = c.kind === "effect" && c.effect ? effects[c.effect.effectIndex] : undefined;
           const bg = scene ? scene.color : `linear-gradient(90deg, ${c.effect?.colorA ?? "#555"}, ${c.effect?.colorB ?? "#333"})`;
-          const label = scene ? scene.name : c.effect?.chaseId ? "★ " + (chases.find((x) => x.id === c.effect!.chaseId)?.name ?? "?") : fxName(fx);
+          // a colour block (all lamps colour A, A = B) shows as that colour
+          const solid = !scene && !!c.effect && !c.effect.chaseId && c.effect.effectIndex === solidIndex && c.effect.colorA.toLowerCase() === c.effect.colorB.toLowerCase();
+          const label = scene ? scene.name : solid ? t("tl.colorClip") : c.effect?.chaseId ? "★ " + (chases.find((x) => x.id === c.effect!.chaseId)?.name ?? "?") : fxName(fx);
           return (
             <div key={c.id} className={"tl-clip" + (selected === c.id ? " selected" : "")}
               style={{ left: c.startMs * pxPerMs, width: Math.max(6, c.lengthMs * pxPerMs), background: bg, color: scene ? contrast(scene.color) : "#fff" }}

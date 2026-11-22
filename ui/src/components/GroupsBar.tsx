@@ -4,6 +4,7 @@ import { useT } from "../i18n";
 import { useShow } from "../store";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
+import { toast } from "../components/Toast";
 
 /** Group chips: click = select the group's fixtures (Ctrl/Shift = add), ⋯ = edit. */
 export function GroupsBar({ selected, setSelected }: { selected: string[]; setSelected: (ids: string[]) => void }) {
@@ -49,7 +50,7 @@ function GroupEditor({ group, selected, close }: { group: FixtureGroup; selected
       <span className="hint">{t("groups.count", { n: group.fixtureIds.length })}</span>
       <button className="btn sm" disabled={!selected.length} onClick={() => api.saveGroup({ id: group.id, fixtureIds: selected })}>{t("groups.update")}</button>
       <div className="row">
-        <button className="btn sm ghost danger" onClick={() => { api.removeGroup(group.id); close(); }}><Icon name="trash" /> {t("groups.delete")}</button>
+        <button className="btn sm ghost danger" onClick={() => { api.removeGroup(group.id); close(); toast(t("toast.groupRemoved", { name: group.name })); }}><Icon name="trash" /> {t("groups.delete")}</button>
         <div style={{ flex: 1 }} />
         <button className="btn sm primary" onClick={close}>{t("scenes.done")}</button>
       </div>

@@ -49,7 +49,7 @@ export interface PatchedFixture {
 
 export interface ColorRef { key?: string; hex?: string }
 export interface FixtureGroup { id: string; name: string; fixtureIds: string[] }
-export interface EffectLayer { groupId: string; effect: EffectSettings; source?: string | null }
+export interface EffectLayer { groupId: string; effect: EffectSettings; source?: string | null; fixtureIds?: string[] | null }
 export type ClipKind = "scene" | "effect";
 export interface TimelineClip { id: string; startMs: number; lengthMs: number; kind: ClipKind; sceneId: string | null; effect: EffectSettings | null; fadeMs: number }
 export interface TimelineTrack { id: string; name: string; kind: "scenes" | "effects"; target: string; clips: TimelineClip[] }
@@ -109,6 +109,8 @@ export interface ShowState {
   faders: Record<string, number[]>;
   effect: EffectSettings;
   layers: EffectLayer[];
+  /** Lamps that keep their own colour while an effect runs (chosen for a selection). */
+  held?: string[];
   fadeMs: number;
   activeScene: string | null;
   strobeSpeed: number;
@@ -186,6 +188,8 @@ export interface AppSettings {
   easy?: EasySettings;
   /** menu tabs switched off in Settings ("easy" = the Easy button) */
   hiddenPages?: string[];
+  /** The four scene buttons in the right column (scene ids, "" = empty); null = the first four scenes. */
+  railScenes?: string[] | null;
   mqtt?: MqttSettings;
   requirePairing?: boolean;
   checkUpdates?: boolean;
@@ -240,6 +244,8 @@ export interface EffectInfo { index: number; key: string; name: string; uses: Ef
 
 export interface Bootstrap {
   version: string;
+  /** "linux" on the Raspberry Pi build: Windows-only parts of the UI are hidden there. */
+  platform?: "windows" | "linux";
   library: FixtureType[];
   palette: { fan: PaletteColor[]; specials: PaletteColor[] };
   effects: EffectInfo[];
@@ -325,13 +331,18 @@ export const api = {
   removeGroup: (id: string) => call("POST", "groups/remove", { id }),
   startLayer: (groupId: string, effect: EffectSettings) => call("POST", "layers/start", { groupId, effect }),
   stopLayer: (groupId: string | null) => call("POST", "layers/stop", { id: groupId }),
+  /** An effect on the lamps chosen on the stage only; null = stop it on those lamps. */
+  selectionEffect: (ids: string[], effect: EffectSettings | null) => call("POST", "layers/selection", { ids, effect }),
   saveScene: (s: { id?: string; name?: string; color?: string; fadeMs?: number; capture?: boolean }) =>
     call<{ id: string }>("POST", "scenes/save", { capture: false, ...s }),
-  recallScene: (id: string) => call("POST", "scenes/recall", { id }),
+  /** With ids (the lamps chosen on the stage): the scene for those lamps only. */
+  recallScene: (id: string, ids?: string[]) => call("POST", "scenes/recall", { id, ids: ids?.length ? ids : undefined }),
   removeScene: (id: string) => call("POST", "scenes/remove", { id }),
   orderScenes: (ids: string[]) => call("POST", "scenes/order", ids),
   sceneTemplates: () => call<SceneTemplateInfo[]>("GET", "scene-templates"),
-  addSceneTemplates: (keys: string[], names: Record<string, string>) => call<{ added: number; skipped: number }>("POST", "scene-templates/add", { keys, names }),
+  /** With ids (lamps chosen on the stage): each example spread over those lamps only. */
+  addSceneTemplates: (keys: string[], names: Record<string, string>, ids?: string[]) =>
+    call<{ added: number; skipped: number; sceneIds?: string[] }>("POST", "scene-templates/add", { keys, names, ids: ids?.length ? ids : undefined }),
   saveTimeline: (t: Timeline) => call<{ id: string }>("POST", "timelines/save", t),
   removeTimeline: (id: string) => call("POST", "timelines/remove", { id }),
   playTimeline: (id: string, fromMs?: number) => call("POST", "timeline/play", { id, fromMs }),
@@ -350,6 +361,8 @@ export const api = {
   },
   mode: (mode: OutputMode) => call("POST", "mode", { mode }),
   effect: (effect: EffectSettings, start: boolean) => call("POST", "effect", { effect, start }),
+  /** A short loop of an effect with the current colours and times: per frame a colour per lamp. */
+  effectPreview: (index: number, lamps: number) => call<string[][]>("GET", `effects/preview?index=${index}&lamps=${lamps}`),
   fader: (id: string, channel: number, value: number) => call("POST", "fader", { id, channel, value }),
   fadersAll: (ids: string[], value: number) => call("POST", "faders/all", { ids, value }),
   fadersFromOutput: () => call("POST", "faders/from-output"),

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type AudioModulation, type MusicSettings } from "../api";
 import { Icon } from "../components/Icon";
-import { SoundEffectsCard } from "../components/SoundEffectsCard";
 import { useT } from "../i18n";
-import { useLive, useShow } from "../store";
+import { onLinux, useLive, useShow } from "../store";
 
 export function MusicPage() {
   const t = useT();
@@ -38,14 +37,18 @@ export function MusicPage() {
   return (
     <div>
       <div className="page-head">
-        <h1>{t("music.title")}</h1>
+        <button className="btn sm ghost" onClick={() => window.dispatchEvent(new Event("dmx-back"))}><Icon name="chevron-left" size={16} /> {t("rail.back")}</button>
+        <h1>{t("music.setupTitle")}</h1>
         <span className={"chip " + (live.listening ? "ok" : "")}><span className="dot" />
           {live.listening ? (live.following ? t("music.following") : t("music.listening")) : t("music.off")}
         </span>
       </div>
 
-      <SoundEffectsCard />
-      <div className="settings-grid" style={{ marginTop: 14 }}>
+      <p className="hint" style={{ marginTop: -6, marginBottom: 14 }}>
+        {t("music.effectsMoved")}{" "}
+        <button className="link-btn" onClick={() => window.dispatchEvent(new CustomEvent("dmx-goto", { detail: "effects" }))}>{t("music.toEffects")}</button>
+      </p>
+      <div className="settings-grid">
         <div className="card stack">
           <div className="row">
             <h2 style={{ flex: 1 }}><Icon name="mic" /> {t("music.input")}</h2>
@@ -60,7 +63,7 @@ export function MusicPage() {
               {devices.map((d) => <option key={d.id} value={d.id}>{devName(d)}</option>)}
             </select>
           </label>
-          <p className="hint">{m.deviceId === "loopback" ? t("music.loopbackHint") : t("music.micHint")}</p>
+          <p className="hint">{m.deviceId === "loopback" && !onLinux() ? t("music.loopbackHint") : t("music.micHint")}</p>
           {live.error && (
             <div className="note warn"><Icon name="warn" />
               <span>{live.error}{isMic && <><br />{t("music.privacy")}</>}</span>

@@ -1,0 +1,31 @@
+# DMX Light Control as a service (installed by install.sh to /etc/systemd/system).
+# Logs:    journalctl -u dmx-light-control -f
+# Restart: sudo systemctl restart dmx-light-control
+[Unit]
+Description=DMX Light Control
+Documentation=https://github.com/inkvolcano/dmx-light-control
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dmxlicht
+Group=dmxlicht
+# groups (set by install.sh): plugdev = the uDMX (udev rule), audio = microphone and MIDI,
+# systemd-journal = USB events in the problem report
+# the show, settings, songs and the log live here (the program folder /opt/dmx-light-control stays read-only)
+Environment=DMXLICHT_DATA=/var/lib/dmx-light-control
+Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/dmx-light-control/.net
+StateDirectory=dmx-light-control
+StateDirectoryMode=0750
+WorkingDirectory=/var/lib/dmx-light-control
+# --network: reachable from phones and tablets on the network (there is no screen on the Pi itself)
+ExecStart=/opt/dmx-light-control/DmxLicht --headless --network
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+# the light gets priority over other work on the Pi
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

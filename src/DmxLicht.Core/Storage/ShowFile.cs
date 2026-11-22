@@ -26,6 +26,8 @@ public sealed class AppSettings
     /// <summary>Menu tabs that are switched off in Settings ("effects", "screen", ..., "easy" = the Easy button).
     /// Settings itself is always shown.</summary>
     public List<string> HiddenPages { get; set; } = new();
+    /// <summary>The four scene buttons in the right column: a scene id per button ("" = empty). Null = the first four scenes.</summary>
+    public List<string> RailScenes { get; set; }
     /// <summary>Home Assistant over MQTT.</summary>
     public MqttSettings Mqtt { get; set; } = new();
     /// <summary>Look for a new version on GitHub at start and once a day (installing always needs a click).</summary>

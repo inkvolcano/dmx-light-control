@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
-import { api, type ColorRef, type FullState, type PaletteColor, type PatchedFixture } from "../api";
-import { ColorInput, contrast } from "../components/ColorPicker";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
+import { api, type FullState, type PatchedFixture } from "../api";
+import { FirstRun } from "../components/FirstRun";
 import { GroupsBar } from "../components/GroupsBar";
-import { ScenesBar } from "../components/ScenesBar";
+import { LiveTools } from "../components/LiveTools";
+import { TimelineEditor, startTimelineDrag } from "./TimelinePage";
 import { Icon } from "../components/Icon";
 import { useT } from "../i18n";
 import { useLive, useShow } from "../store";
@@ -33,146 +34,64 @@ export function stagePositions(patch: PatchedFixture[]): Record<string, Pos> {
   return out;
 }
 
-/** "Picking a colour also turns the lamp on" - remembered per device. */
-function useColorTurnsOn(): [boolean, (v: boolean) => void] {
-  const [v, setV] = useState(() => {
-    try { return localStorage.getItem("colorTurnsOn") !== "0"; } catch { return true; }
-  });
-  useEffect(() => { try { localStorage.setItem("colorTurnsOn", v ? "1" : "0"); } catch { /* ignore */ } }, [v]);
-  return [v, setV];
-}
-
 export function LivePage({ selected, setSelected, goPatch }: Props) {
   const t = useT();
   const { full, boot } = useShow();
-  const [colorTurnsOn, setColorTurnsOn] = useColorTurnsOn();
+  // the timeline, folded open under the stage with a tick box (per device; "go to the timeline" opens it)
+  const [showTl, setShowTlState] = useState(() => { try { return localStorage.getItem("liveTimeline") === "1"; } catch { return false; } });
+  const setShowTl = (v: boolean) => { setShowTlState(v); try { localStorage.setItem("liveTimeline", v ? "1" : "0"); } catch { /* ignore */ } };
+  useEffect(() => {
+    const on = () => setShowTlState(true);
+    window.addEventListener("dmx-livetimeline", on);
+    return () => window.removeEventListener("dmx-livetimeline", on);
+  }, []);
+  // no lamps yet: the three-step start, which stays until it is finished (it adds lamps on the way)
+  const [wizard, setWizard] = useState(() => !!full && full.patch.length === 0);
+  useEffect(() => { if (full && full.patch.length === 0) setWizard(true); }, [full?.patch.length]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!full || !boot) return null;
-  const targets = selected.length > 0 ? selected : [];
-  const count = selected.length || full.patch.length;
 
-  if (full.patch.length === 0)
-    return (
-      <div className="empty">
-        <Icon name="bulb" size={40} />
-        <div>{t("live.empty")}</div>
-        <button className="btn primary" onClick={goPatch}>{t("live.goPatch")}</button>
-      </div>
-    );
+  if (wizard || full.patch.length === 0)
+    return <FirstRun goPatch={goPatch} onDone={() => setWizard(false)} />;
 
-  const looks = (selected.length ? selected : full.patch.map((p) => p.id)).map((id) => full.state.looks[id]);
-  const allOn = full.state.mode === "static" && looks.every((l) => l?.on);
-  const allOff = full.state.mode === "static" && looks.every((l) => !l?.on);
-  const pick = (color: ColorRef) => api.looks(targets, colorTurnsOn ? true : undefined, color);
 
   return (
     <div className="live">
       <div>
-        <div className="page-head">
-          <h1>{t("live.title")}</h1>
-          <span className="chip">{selected.length ? t("live.selected", { n: selected.length }) : t("live.allLamps")}</span>
-          <div className="grow" />
-          <button className="btn sm ghost" onClick={() => api.updateFixtures(full.patch.map((p) => ({ id: p.id, x: -1, y: -1 })))}>
-            <Icon name="layout" /> {t("live.resetLayout")}
-          </button>
-          <button className="btn sm" onClick={() => setSelected(full.patch.map((p) => p.id))}>{t("live.selectAll")}</button>
-          <button className="btn sm" onClick={() => setSelected([])} disabled={!selected.length}>{t("live.selectNone")}</button>
-        </div>
-        <ScenesBar />
         <GroupsBar selected={selected} setSelected={setSelected} />
-        <Stage full={full} selected={selected} setSelected={setSelected} />
-        <p className="hint" style={{ marginTop: 10 }}>{t("live.hint")}</p>
+        {/* the stage's own buttons sit in the stage, top right; what is chosen top left; the hint at the bottom */}
+        <Stage full={full} selected={selected} setSelected={setSelected}
+          info={<span className={"chip" + (selected.length ? " ok" : "")}>{selected.length ? t("live.selected", { n: selected.length }) : t("live.allLamps")}</span>}
+          tools={<>
+            <button className="btn sm ghost" title={t("live.resetLayout")} onClick={() => api.updateFixtures(full.patch.map((p) => ({ id: p.id, x: -1, y: -1 })))}>
+              <Icon name="layout" />
+            </button>
+            <button className="btn sm" onClick={() => setSelected(full.patch.map((p) => p.id))}>{t("live.selectAll")}</button>
+            <button className="btn sm" onClick={() => setSelected([])} disabled={!selected.length}>{t("live.selectNone")}</button>
+          </>}
+          hint={t("live.hint")} />
       </div>
 
-      <div className="card palette-panel">
-        <div className="onoff">
-          <button className={"btn lg on" + (allOn ? " active" : "")} onClick={() => api.looks(targets, true)}>
-            <Icon name="power" /> {t("live.on")} <span className="muted">({count})</span>
-          </button>
-          <button className={"btn lg off" + (allOff ? " active" : "")} onClick={() => api.looks(targets, false)}>
-            {t("live.off")} <span className="muted">({count})</span>
-          </button>
-        </div>
-        <label className="check" style={{ marginBottom: 12 }}>
-          <input type="checkbox" checked={colorTurnsOn} onChange={(e) => setColorTurnsOn(e.target.checked)} />
-          <span className="box" /> {t("live.colorTurnsOn")}
+      {/* under the stage: colours, effects, presets (for the chosen lamps, or all) */}
+      {/* between the stage and the tools: fold the timeline open or shut */}
+      {/* one box: the switch is its head, the timeline (when open) its body */}
+      <div className={"tl-panel" + (showTl ? " open" : "")}>
+        <label className="check tl-toggle" title={t("live.timelineHint")}>
+          <input type="checkbox" checked={showTl} onChange={(e) => setShowTl(e.target.checked)} />
+          <span className="box" /> <Icon name="timeline" size={15} /> {t("nav.timeline")}
         </label>
-        <div className="palette-section">
-          <h3>{t("live.palette")}</h3>
-          <Swatches colors={boot.palette.fan} cls="fan" onPick={(c) => pick({ key: c.key })} />
-        </div>
-        <div className="palette-section">
-          <h3>{t("live.specials")}</h3>
-          <Swatches colors={boot.palette.specials} cls="special" onPick={(c) => pick({ key: c.key })} />
-        </div>
-        <CustomColors colors={full.state.customColors} onPick={(hex) => pick({ hex })} />
-        <FadeControl value={full.state.fadeMs} />
-        <div className="palette-section">
-          <h3>{t("live.strobeSpeed")}</h3>
-          <div className="slider">
-            <input type="range" min={1} max={100} value={full.state.strobeSpeed} onChange={(e) => api.strobe({ speed: +e.target.value })} />
-            <span className="val">{full.state.strobeSpeed}</span>
-          </div>
-        </div>
+        {showTl && <div className="live-timeline"><TimelineEditor embedded /></div>}
       </div>
-    </div>
-  );
-}
-
-function FadeControl({ value }: { value: number }) {
-  const t = useT();
-  const steps = [0, 300, 1000, 2000, 5000];
-  return (
-    <div className="palette-section">
-      <h3>{t("live.fade")}</h3>
-      <div className="seg" style={{ width: "100%" }}>
-        {steps.map((ms) => (
-          <button key={ms} style={{ flex: 1 }} className={value === ms ? "active" : ""} onClick={() => api.master({ fadeMs: ms })}>
-            {ms === 0 ? t("live.fadeNone") : ms / 1000 + " s"}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Swatches({ colors, cls, onPick }: { colors: PaletteColor[]; cls: string; onPick: (c: PaletteColor) => void }) {
-  const t = useT();
-  return (
-    <div className={"swatches " + cls}>
-      {colors.map((c) => (
-        <button key={c.key} className="swatch" style={{ background: c.hex, color: contrast(c.hex) }}
-          title={t("color." + c.key, undefined, c.name)} onClick={() => onPick(c)}>
-          {c.key === "uv" ? "UV" : ""}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function CustomColors({ colors, onPick }: { colors: string[]; onPick: (hex: string) => void }) {
-  const t = useT();
-  const save = (list: string[]) => api.customColors(list);
-  return (
-    <div className="palette-section">
-      <h3>{t("live.custom")}</h3>
-      <div className="swatches custom">
-        {colors.map((hex, i) => (
-          <button key={i + hex} className="swatch" style={{ background: hex }} title={hex + " - " + t("live.customHint")}
-            onClick={() => onPick(hex)}
-            onContextMenu={(e) => { e.preventDefault(); save(colors.filter((_, j) => j !== i)); }} />
-        ))}
-        <label className="swatch add" title={t("live.addCustom")}>
-          +
-          <ColorInput value="#ffffff" onPick={(hex) => { if (!colors.includes(hex)) save([...colors, hex]); onPick(hex); }} />
-        </label>
-      </div>
+      <LiveTools selected={selected} onDrag={showTl ? startTimelineDrag : undefined} />
     </div>
   );
 }
 
 // ---------------------------------------------------------------- stage
 
-function Stage({ full, selected, setSelected }: { full: FullState; selected: string[]; setSelected: (ids: string[]) => void }) {
+function Stage({ full, selected, setSelected, info, tools, hint }: {
+  full: FullState; selected: string[]; setSelected: (ids: string[]) => void; info?: ReactNode; tools?: ReactNode; hint?: string;
+}) {
+  const t = useT();
   const { heads } = useLive();
   const ref = useRef<HTMLDivElement>(null);
   const base = useMemo(() => stagePositions(full.patch), [full.patch]);
@@ -246,8 +165,12 @@ function Stage({ full, selected, setSelected }: { full: FullState; selected: str
   };
 
   return (
-    <div className="stage" ref={ref} onPointerDown={onStageDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
-      <div className="stage-label">stage</div>
+    <div className={"stage" + (full.patch.length <= 8 ? " few" : "")} ref={ref} onPointerDown={onStageDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+      <div className="stage-label">{t("live.stageLabel")}</div>
+      {/* clicks on these never start a lasso or deselect */}
+      {info && <div className="stage-info" onPointerDown={(e) => e.stopPropagation()}>{info}</div>}
+      {tools && <div className="stage-tools" onPointerDown={(e) => e.stopPropagation()}>{tools}</div>}
+      {hint && <div className="stage-hint">{hint}</div>}
       {full.patch.map((p) => {
         const info = rig[p.id];
         const b = base[p.id];

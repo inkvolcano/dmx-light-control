@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HelpPanel } from "./components/Help";
+import { LiveRail } from "./components/LiveRail";
+import { CommandPalette } from "./components/CommandPalette";
+import { Toaster } from "./components/Toast";
 import { Icon } from "./components/Icon";
 import { TopBar } from "./components/TopBar";
 import { useT } from "./i18n";
@@ -18,13 +21,15 @@ import { PinDialog } from "./pages/OperatorView";
 import { EasyView } from "./pages/EasyView";
 import { PairScreen } from "./pages/PairScreen";
 import { sessionPin } from "./api";
-import { useShow } from "./store";
+import { onLinux, useShow } from "./store";
 
 import { isShown, pages, type PageId } from "./pages/pageList";
 
 function savedPage(): PageId {
   try {
     const p = localStorage.getItem("page");
+    if (p === "effects") { localStorage.setItem("liveTab", "effects"); return "live"; }
+    if (p === "timeline") { localStorage.setItem("liveTimeline", "1"); return "live"; }
     if (pages.some((x) => x.id === p)) return p as PageId;
   } catch { /* storage unavailable */ }
   return "live";
@@ -58,14 +63,41 @@ export function App() {
     return () => window.removeEventListener("dmx-easy", on);
   }, []);
   const hiddenKey = (full?.settings.hiddenPages ?? []).join(",");
+  // shown in the menu: not hidden by the user, and available here (no screen sync on Linux)
+  const visible = (id: string) => isShown(id, full?.settings.hiddenPages) && !(id === "screen" && onLinux());
   useEffect(() => {
-    if (!isShown(page, full?.settings.hiddenPages)) setPage(pages.find((p) => isShown(p.id, full?.settings.hiddenPages))?.id ?? "settings");
+    if (!visible(page)) setPage(pages.find((p) => visible(p.id))?.id ?? "settings");
   }, [hiddenKey]); // eslint-disable-line react-hooks/exhaustive-deps -- not on page: a hidden page opened from elsewhere stays open
   // other parts of the app can open a page (e.g. the effects panel opens the Screen page)
   useEffect(() => {
-    const go = (e: Event) => { const p = (e as CustomEvent<string>).detail; if (pages.some((x) => x.id === p)) setPage(p as PageId); };
+    const go = (e: Event) => {
+      const p = (e as CustomEvent<string>).detail;
+      // effects and presets live on Bediening, as tabs under the stage
+      if (p === "effects" || p === "presets") {
+        try { localStorage.setItem("liveTab", p); } catch { /* ignore */ }
+        setPage("live");
+        window.dispatchEvent(new CustomEvent("dmx-livetab", { detail: p }));
+        return;
+      }
+      if (p === "timeline") {
+        try { localStorage.setItem("liveTimeline", "1"); } catch { /* ignore */ }
+        setPage("live");
+        window.dispatchEvent(new Event("dmx-livetimeline"));
+        return;
+      }
+      if (pages.some((x) => x.id === p)) setPage(p as PageId);
+    };
     window.addEventListener("dmx-goto", go);
     return () => window.removeEventListener("dmx-goto", go);
+  }, []);
+  // search everything: Ctrl+K, or the search button in the top bar
+  const [search, setSearch] = useState(false);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearch((v) => !v); } };
+    const open = () => setSearch(true);
+    window.addEventListener("keydown", key);
+    window.addEventListener("dmx-search", open);
+    return () => { window.removeEventListener("keydown", key); window.removeEventListener("dmx-search", open); };
   }, []);
   // help: only on request (F1 or the ? button), never by itself
   const [help, setHelp] = useState<null | "page" | "start">(null);
@@ -76,12 +108,35 @@ export function App() {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, []);
+  // right column: folded per device; on a phone it is always the small strip of meters
+  const [folded, setFolded] = useState(() => { try { return localStorage.getItem("railFolded") === "1"; } catch { return false; } });
+  const fold = () => setFolded((f) => { try { localStorage.setItem("railFolded", f ? "0" : "1"); } catch { /* ignore */ } return !f; });
+  const [phone, setPhone] = useState(() => window.matchMedia("(max-width: 720px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 720px)");
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  // "Opbouwen" in the menu: open while one of its pages is open, or when opened by hand
+  const onBuild = pages.some((p) => p.id === page && p.group === "build" && p.menu);
+  const [buildOpenByHand, setBuildOpen] = useState(() => { try { return localStorage.getItem("buildOpen") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("buildOpen", buildOpenByHand ? "1" : "0"); } catch { /* ignore */ } }, [buildOpenByHand]);
+  const buildOpen = buildOpenByHand || onBuild;
   const locked = !!full?.settings.locked && !unlocked;
   const lock = () => { try { sessionStorage.removeItem("pin"); } catch { /* ignore */ } setUnlocked(false); };
 
+  // a setup page opened from the right column goes back to the menu page it came from
+  const lastMenuPage = useRef<PageId>("live");
   useEffect(() => {
     try { localStorage.setItem("page", page); } catch { /* ignore */ }
+    if (pages.some((p) => p.id === page && p.menu)) lastMenuPage.current = page;
   }, [page]);
+  useEffect(() => {
+    const back = () => setPage(lastMenuPage.current);
+    window.addEventListener("dmx-back", back);
+    return () => window.removeEventListener("dmx-back", back);
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = full?.settings.language ?? "nl";
@@ -113,8 +168,19 @@ export function App() {
     <div className="shell">
       <nav className="sidebar">
         <div className="brand" title="DMX Light Control"><div className="brand-dot" /></div>
-        {pages.filter((p) => isShown(p.id, full?.settings.hiddenPages)).map((p) => (
+        {pages.filter((p) => p.menu && p.group === "play" && visible(p.id)).map((p) => (
           <button key={p.id} className={"nav-btn" + (page === p.id ? " active" : "")} onClick={() => setPage(p.id)}>
+            <Icon name={p.icon} />
+            {t("nav." + p.id)}
+          </button>
+        ))}
+        {/* setting up: folded away behind one button, open while you are on one of its pages */}
+        <button className={"nav-btn nav-build" + (buildOpen ? " open" : "")} onClick={() => setBuildOpen(!buildOpen)} aria-expanded={buildOpen}>
+          <Icon name="gear" />
+          {t("nav.build")}
+        </button>
+        {buildOpen && pages.filter((p) => p.menu && p.group === "build" && visible(p.id)).map((p) => (
+          <button key={p.id} className={"nav-btn sub" + (page === p.id ? " active" : "")} onClick={() => setPage(p.id)}>
             <Icon name={p.icon} />
             {t("nav." + p.id)}
           </button>
@@ -131,7 +197,7 @@ export function App() {
           <button className="nav-btn" onClick={lock} title={t("op.lockNow")}><Icon name="lock" />{t("op.lock")}</button>
         )}
       </nav>
-      <TopBar />
+      <TopBar rail={!!full && isShown("rail", full.settings.hiddenPages)} />
       <main className="main">
         {full && boot && (
           <>
@@ -149,7 +215,10 @@ export function App() {
           </>
         )}
       </main>
+      {full && boot && isShown("rail", full.settings.hiddenPages) && <LiveRail folded={folded || phone} onFold={fold} page={page} selected={selected} />}
       {help && <HelpPanel page={page} initialTab={help} onClose={closeHelp} />}
+      <CommandPalette open={search} onClose={() => setSearch(false)} />
+      <Toaster />
       {!online && (
         <div className="offline">
           <div className="box"><div className="spinner" />{t("status.offline")}</div>

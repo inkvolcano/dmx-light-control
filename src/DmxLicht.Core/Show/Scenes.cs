@@ -15,8 +15,10 @@ public sealed class FixtureGroup
 /// <summary>An effect running on one group, on top of whatever the rest does.</summary>
 public sealed class EffectLayer
 {
-    /// <summary>Group id, or "*" for all fixtures.</summary>
+    /// <summary>Group id, or "*" for all fixtures, or "scene:" + a scene id for a scene on a selection.</summary>
     public string GroupId { get; set; }
+    /// <summary>When set: these fixtures instead of a group (a scene recalled on some lamps only).</summary>
+    public List<string> FixtureIds { get; set; }
     /// <summary>Who started it: null = the user, "timeline" = the timeline player.</summary>
     public string Source { get; set; }
     public EffectSettings Effect { get; set; } = new();
@@ -30,6 +32,7 @@ public sealed class SceneState
     public Dictionary<string, byte[]> Faders { get; set; } = new();
     public EffectSettings Effect { get; set; } = new();
     public List<EffectLayer> Layers { get; set; } = new();
+    public List<string> Held { get; set; } = new();
 }
 
 /// <summary>A saved look with a button colour and a fade time.</summary>
@@ -50,7 +53,7 @@ public static class SceneOps
 
     public static SceneState Capture(ShowState s)
     {
-        SceneState c = Clone(new SceneState { Mode = s.Mode, Looks = s.Looks, Faders = s.Faders, Effect = s.Effect, Layers = s.Layers });
+        SceneState c = Clone(new SceneState { Mode = s.Mode, Looks = s.Looks, Faders = s.Faders, Effect = s.Effect, Layers = s.Layers, Held = s.Held });
         c.Layers?.RemoveAll(l => l.Source != null);   // a flash or timeline effect running now is not part of the scene
         return c;
     }
@@ -63,6 +66,7 @@ public static class SceneOps
         s.Faders = c.Faders ?? new();
         s.Effect = c.Effect ?? new();
         s.Layers = c.Layers ?? new();
+        s.Held = c.Held ?? new();
     }
 
     /// <summary>A sensible button colour: the colour most lamps have, or effect colour A.</summary>

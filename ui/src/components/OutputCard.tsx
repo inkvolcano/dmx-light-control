@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, type AppSettings } from "../api";
 import { useT } from "../i18n";
-import { useLive } from "../store";
+import { onLinux, useLive } from "../store";
 import { Help } from "./Help";
 import { Icon } from "./Icon";
 
@@ -41,10 +41,12 @@ export function OutputCard({ settings, save }: { settings: AppSettings; save: (c
       setPower({ busy: false, msg: t("usb.power." + (["ok", "cancelled", "notfound"].includes(r.result) ? r.result : "failed"), { error: r.result }), ok: r.result === "ok" });
     } catch (e) { setPower({ busy: false, msg: String(e), ok: false }); }
   };
+  const linux = onLinux();
   const troubled = o.reconnects > 0 || o.errors > o.recovered || (!o.connected && o.fault !== "NotFound");
   const tips = o.fault === "InUse" ? ["tip.inUse"]
-    : o.fault === "DriverMissing" ? ["tip.driver"]
-    : troubled ? ["tip.usb2", "tip.hub", "tip.power", "tip.selective", "tip.battery", "tip.cable", "tip.dmxLine"] : [];
+    : o.fault === "DriverMissing" ? [linux ? "linux.tipDriver" : "tip.driver"]
+    : troubled ? (linux ? ["tip.usb2", "tip.hub", "linux.tipPower", "tip.cable", "tip.dmxLine"]
+      : ["tip.usb2", "tip.hub", "tip.power", "tip.selective", "tip.battery", "tip.cable", "tip.dmxLine"]) : [];
 
   return (
     <div className="card stack">
@@ -57,7 +59,7 @@ export function OutputCard({ settings, save }: { settings: AppSettings; save: (c
 
       {!o.connected && (
         <div className="note warn"><Icon name="warn" />
-          <span><b>{t("fault." + (o.fault ?? "Other"))}</b>{o.detail && o.fault !== "NotFound" ? <><br /><span className="mono">{o.detail}</span></> : null}</span>
+          <span><b>{t((linux && o.fault === "DriverMissing" ? "linux.fault." : "fault.") + (o.fault ?? "Other"))}</b>{o.detail && o.fault !== "NotFound" ? <><br /><span className="mono">{o.detail}</span></> : null}</span>
         </div>
       )}
 
@@ -76,26 +78,26 @@ export function OutputCard({ settings, save }: { settings: AppSettings; save: (c
           {[0, 1, 2].map((i) => <option key={i} value={i}>{t("settings.speed" + i)}</option>)}
         </select>
       </label>
-      <label className="check">
+      {!linux && <label className="check">
         <input type="checkbox" checked={settings.preventSleep} onChange={(e) => save({ preventSleep: e.target.checked })} />
         <span className="box" /> {t("settings.preventSleep")}
-      </label>
+      </label>}
       <div className="row">
         <button className="btn primary" disabled={rec.busy} onClick={() => recover(false)} title={t("usb.hint")}><Icon name="power" /> {t("usb.recover")}</button>
         <button className="btn" onClick={() => api.reconnect()}><Icon name="refresh" /> {t("status.reconnect")}</button>
         <button className="btn ghost" onClick={async () => setLog(log ? null : await api.log())}>{t("diag.log")}</button>
       </div>
-      <div className="row">
+      {!linux && <div className="row">
         <button className="btn" disabled={power.busy} onClick={usbPower}><Icon name="bolt" /> {t("usb.powerButton")}</button>
         <Help k="usb.powerHelp" />
-      </div>
+      </div>}
       {power.msg && <div className={"note" + (power.ok ? "" : " warn")}><Icon name={power.ok ? "info" : "warn"} /><span>{power.msg}</span></div>}
 
       {rec.result && (
         <div className={"note" + (rec.ok ? "" : " warn")}>
           <Icon name={rec.ok ? "info" : "warn"} />
           <span>{rec.result}
-            {rec.offerDeep && <><br /><button className="btn sm" style={{ marginTop: 6 }} disabled={rec.busy} onClick={() => recover(true)}>{t("usb.deep")}</button></>}
+            {rec.offerDeep && !linux && <><br /><button className="btn sm" style={{ marginTop: 6 }} disabled={rec.busy} onClick={() => recover(true)}>{t("usb.deep")}</button></>}
           </span>
         </div>
       )}

@@ -3,6 +3,9 @@ import { api, type EffectInfo, type EffectParam, type EffectSettings } from "../
 import { type CustomChase, newChase } from "../chase";
 import { ChaseEditor } from "../components/ChaseEditor";
 import { ColorInput, contrast } from "../components/ColorPicker";
+import { FxPreview } from "../components/FxPreview";
+import type { DragStart } from "../components/LiveTools";
+import { toast } from "../components/Toast";
 import { Help } from "../components/Help";
 import { Icon } from "../components/Icon";
 import { ScreenSyncPanel } from "../components/ScreenSyncPanel";
@@ -24,19 +27,34 @@ const categories: Record<string, string[]> = {
     "audio-vu-center", "audio-volume-color", "audio-bass-flash", "audio-pitch-color", "audio-sparkle", "audio-fire", "audio-surge-strobe"],
 };
 
-// Little colour hint on each card.
-const bars: Record<string, string> = {
-  police: "linear-gradient(90deg,#f33 50%,#33f 50%)", ambulance: "linear-gradient(90deg,#33f 50%,#fff 50%)",
-  "fire-brigade": "linear-gradient(90deg,#f33 50%,#fff 50%)", christmas: "linear-gradient(90deg,#f33,#3c3,#fff)",
-  fire: "linear-gradient(90deg,#f40,#fa0,#f60)", sunset: "linear-gradient(90deg,#fd0,#f60,#a00)",
-  waterfall: "linear-gradient(90deg,#0ff,#00f)", ocean: "linear-gradient(90deg,#03f,#0df,#03f)",
-  aurora: "linear-gradient(90deg,#3f9,#0cf,#93f)", candle: "linear-gradient(90deg,#f80,#fb4,#f80)",
-  snow: "linear-gradient(90deg,#fff,#889,#fff)", lightning: "linear-gradient(90deg,#222,#fff,#222)",
-  "strobe-white": "repeating-linear-gradient(90deg,#fff 0 6px,#222 6px 12px)",
-};
-const rainbow = "linear-gradient(90deg,#f33,#fb3,#3f6,#3cf,#93f,#f3c)";
 
+// The filter shows a few broad groups; each effect's own category falls into one of them.
+const groupOf: Record<string, string> = {
+  onoff: "rhythm", chase: "rhythm", smooth: "calm", nature: "calm", color: "colors", theme: "colors", party: "colors", sound: "sound",
+};
+const filters = ["all", "fav", "recent", "rhythm", "calm", "colors", "sound", "own"];
+
+/** A list of effect keys kept on this device (favourites, recently used). */
+function useKeyList(name: string, max = 200): [string[], (next: string[]) => void] {
+  const [list, setList] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(name) ?? "[]"); } catch { return []; } });
+  const save = (next: string[]) => {
+    const v = next.slice(0, max);
+    setList(v);
+    try { localStorage.setItem(name, JSON.stringify(v)); } catch { /* ignore */ }
+  };
+  return [list, save];
+}
+
+/** The effects page is now the Effecten tab of Bediening; kept for old links. */
 export function EffectsPage() {
+  return <EffectsPanel />;
+}
+
+/**
+ * Effects: pick one, its colours and speed. With lamps chosen on the stage (`selected`) the effect runs on
+ * those lamps only; otherwise on all lamps (or on the group chosen at "for").
+ */
+export function EffectsPanel({ selected = [], onDrag, requireSelection = false }: { selected?: string[]; onDrag?: DragStart; requireSelection?: boolean }) {
   const t = useT();
   const { full, boot } = useShow();
   const { heads } = useLive();
@@ -45,17 +63,23 @@ export function EffectsPage() {
   const [local, setLocal] = useState<EffectSettings | null>(null);
   const [target, setTarget] = useState("");  // "" = all fixtures, else a group id
   const [editing, setEditing] = useState<CustomChase | null>(null);
+  const [favs, setFavs] = useKeyList("fxFavorites");
+  const [recent, setRecent] = useKeyList("fxRecent", 12);
   const chases = full!.state.chases ?? [];
 
   const groups = full!.groups;
   const layers = full!.state.layers;
-  const layer = target ? layers.find((l) => l.groupId === target) : undefined;
+  // lamps chosen on the stage: their own effect (the layer that holds exactly these lamps)
+  const sel = selected.length > 0 && selected.length < full!.patch.length ? selected : [];
+  const selKey = [...sel].sort().join(",");
+  const selLayer = sel.length ? layers.find((l) => !l.source && l.fixtureIds && [...l.fixtureIds].sort().join(",") === selKey) : undefined;
+  const layer = sel.length ? selLayer : target ? layers.find((l) => l.groupId === target) : undefined;
   const server = layer?.effect ?? full!.state.effect;
   // follow server changes unless the user is mid-edit (local is cleared after each send)
-  useEffect(() => setLocal(null), [server, target]);
+  useEffect(() => setLocal(null), [server, target, selKey]);
   useEffect(() => { if (target && !groups.some((g) => g.id === target)) setTarget(""); }, [groups, target]);
   const fx = local ?? server;
-  const running = target ? !!layer : full!.state.mode === "effect";
+  const running = sel.length ? !!selLayer : target ? !!layer : full!.state.mode === "effect";
   const effects = boot!.effects;
   const screen = !!fx.screenSync;
   const chase = !screen && fx.chaseId ? chases.find((c) => c.id === fx.chaseId) : undefined;
@@ -63,20 +87,35 @@ export function EffectsPage() {
   const uses = new Set<EffectParam>(current?.uses ?? []);
 
   const name = (e: EffectInfo) => t("fxname." + e.key, undefined, e.name);
-  const list = useMemo(() => effects.filter((e) =>
-    cat !== "own" && cat !== "screen" && (cat === "all" || (e.category ? e.category === cat : categories[cat]?.includes(e.key))) &&
-    (!query || name(e).toLowerCase().includes(query.toLowerCase()))), [effects, cat, query, full?.settings.language]);
+  const groupOfEffect = (e: EffectInfo) => {
+    const c = e.category ?? Object.keys(categories).find((k) => categories[k].includes(e.key));
+    return c ? groupOf[c] : undefined;
+  };
+  const list = useMemo(() => {
+    const hit = (e: EffectInfo) => !query || name(e).toLowerCase().includes(query.toLowerCase());
+    if (cat === "own") return [];
+    if (cat === "fav") return favs.map((k) => effects.find((e) => e.key === k)).filter((e): e is EffectInfo => !!e && hit(e));
+    if (cat === "recent") return recent.map((k) => effects.find((e) => e.key === k)).filter((e): e is EffectInfo => !!e && hit(e));
+    return effects.filter((e) => (cat === "all" || groupOfEffect(e) === cat) && hit(e));
+  }, [effects, cat, query, favs, recent, full?.settings.language]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleFav = (k: string) => setFavs(favs.includes(k) ? favs.filter((x) => x !== k) : [k, ...favs]);
 
   const send = (next: EffectSettings, start = running) => {
     setLocal(next);
-    if (!target) api.effect(next, start);
+    // on Bediening nothing chosen means nothing happens (choose lamps, or "Alles kiezen")
+    if (requireSelection && selected.length === 0) { if (start) toast(t("live.pickFirst"), false); return; }
+    if (sel.length) { if (start) api.selectionEffect(sel, next); }
+    else if (!target) api.effect(next, start);
     else if (start) api.startLayer(target, next);
   };
-  const stop = () => (target ? api.stopLayer(target) : api.mode("static"));
+  const stop = () => (sel.length ? api.selectionEffect(sel, null) : target ? api.stopLayer(target) : api.mode("static"));
 
   const choose = (e: EffectInfo) => {
     if (running && !chase && !screen && e.index === fx.effectIndex) stop();
-    else send({ ...fx, effectIndex: e.index, chaseId: null, screenSync: false }, true);
+    else {
+      setRecent([e.key, ...recent.filter((k) => k !== e.key)]);
+      send({ ...fx, effectIndex: e.index, chaseId: null, screenSync: false }, true);
+    }
   };
   const chooseChase = (c: CustomChase) => {
     if (running && chase?.id === c.id) stop();
@@ -92,12 +131,101 @@ export function EffectsPage() {
     .map((p) => (p === "ColorA" ? (fx.colorPerLamp ? t("fx.lampColors") : t("fx.colorA")) : p === "ColorB" ? t("fx.colorB")
       : p === "Step" ? t("fx.step") : p === "OnOff" ? t("fx.on") + "/" + t("fx.off") : t("fx.delay")));
 
+  const layerTitle = (id: string) => id.startsWith("scene:")
+    ? t("rail.sceneOnSelection", { name: full!.scenes.find((x) => "scene:" + x.id === id)?.name ?? "?" })
+    : id.startsWith("sel:") ? t("rail.selectionLayer", { n: layers.find((l) => l.groupId === id)?.fixtureIds?.length ?? 0 })
+    : groups.find((g) => g.id === id)?.name ?? "?";
+
   return (
     <div className="fx-layout">
+      {/* the chosen effect on top, in one wide bar: name and start/stop, what the lamps do, colours and speed */}
+      <div className="card fx-settings">
+        <div className="fx-set-top">
+          <h2 className="fx-set-name">{screen ? t("fx.screen") : chase ? chase.name : current ? name(current) : ""}</h2>
+          <Help k="fx.panelHelp" />
+          {running
+            ? <button className="btn off active" onClick={stop}><Icon name="stop" /> {t("fx.stop")}</button>
+            : <button className="btn primary" onClick={() => send(fx, true)}><Icon name="play" /> {t("fx.start")}</button>}
+          <div className="preview-strip fx-set-strip" title={t("fx.preview")}>
+            {(heads.length ? heads : ["#000000"]).map((h, i) => <div key={i} style={{ background: h }} />)}
+          </div>
+        </div>
+        {screen ? (
+          <ScreenSyncPanel />
+        ) : chase ? (
+          <div className="row">
+            <p className="hint grow" style={{ margin: 0 }}>{t("ch.panelHint")}</p>
+            <button className="btn" onClick={() => setEditing(chase)}><Icon name="edit" /> {t("ch.edit")}</button>
+          </div>
+        ) : (
+          <>
+            {/* left: the colours and "colour per lamp"; right: speed and every time, under each other */}
+            <div className="fx-set-body">
+              <div className="fx-set-colors">
+                <div className="fx-set-ab">
+                  <ColorField label={t("fx.colorA")} value={fx.colorA} disabled={!uses.has("ColorA") || fx.colorPerLamp}
+                    onPick={(hex) => send({ ...fx, colorA: hex })} />
+                  <ColorField label={t("fx.colorB")} value={fx.colorB} disabled={!uses.has("ColorB")}
+                    onPick={(hex) => send({ ...fx, colorB: hex })} />
+                </div>
+                <label className="check">
+                  <input type="checkbox" checked={fx.colorPerLamp} disabled={!uses.has("ColorA")}
+                    onChange={(e) => send({ ...fx, colorPerLamp: e.target.checked })} />
+                  <span className="box" />
+                  <span className={uses.has("ColorA") ? "" : "muted"}>{t("fx.perLamp")}</span>
+                </label>
+                {fx.colorPerLamp && uses.has("ColorA") && (
+                  <div className="lampcolors">
+                    {Array.from({ length: Math.max(full!.rig.heads, 1) }, (_, i) => {
+                      const c = fx.lampColors[i] ?? "#FFFFFF";
+                      return (
+                        <label key={i} className="colorbtn" style={{ background: c, color: contrast(c) }}>
+                          {i + 1}
+                          <ColorInput value={c} onPick={(hex) => {
+                            const lc = [...fx.lampColors];
+                            while (lc.length <= i) lc.push("#FFFFFF");
+                            lc[i] = hex;
+                            send({ ...fx, lampColors: lc });
+                          }} />
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="fx-set-sliders">
+                {(uses.has("Step") || uses.has("OnOff") || uses.has("Delay")) && (
+                  <SpeedParam fx={fx} uses={uses} onChange={(next) => send(next)} beat={full!.state.music.syncEffects} />
+                )}
+                <TimeParam label={t("fx.step")} value={fx.stepMs} min={40} max={5000} enabled={uses.has("Step")} onChange={(v) => send({ ...fx, stepMs: v })} />
+                <TimeParam label={t("fx.on")} value={fx.onMs} min={20} max={10000} enabled={uses.has("OnOff")} onChange={(v) => send({ ...fx, onMs: v })} />
+                <TimeParam label={t("fx.off")} value={fx.offMs} min={20} max={10000} enabled={uses.has("OnOff")} onChange={(v) => send({ ...fx, offMs: v })} />
+                <TimeParam label={t("fx.delay")} value={fx.delayMs} min={0} max={10000} enabled={uses.has("Delay")} onChange={(v) => send({ ...fx, delayMs: v })} />
+              </div>
+            </div>
+            <p className="hint" style={{ margin: 0 }}>{usedList.length ? t("fx.uses", { list: usedList.join(", ") }) : t("fx.usesNone")}</p>
+          </>
+        )}
+        {layers.length > 0 && (
+          <div className="stack fx-set-layers" style={{ gap: 6 }}>
+            <h3>{t("fx.layers")}</h3>
+            {layers.map((l) => (
+              <div key={l.groupId} className="layer-row">
+                <b>{layerTitle(l.groupId)}</b>
+                <span className="grow muted">{layerName(l.effect)}</span>
+                {!l.groupId.includes(":") && <button className="btn sm" onClick={() => setTarget(l.groupId)}>⋯</button>}
+                <button className="btn sm off" onClick={() => api.stopLayer(l.groupId)}>{t("fx.layerStop")}</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div>
-        <div className="page-head">
-          <h1>{t("fx.title")}</h1>
-          {groups.length > 0 && (
+        <div className="page-head fx-head">
+          {sel.length > 0
+            ? <span className="chip ok"><span className="dot" />{t("fx.forSelection", { n: sel.length })}</span>
+            : <span className="chip">{t("fx.forAll")}</span>}
+          {sel.length === 0 && groups.length > 0 && (
             <label className="row" style={{ gap: 8 }}>
               <span className="muted">{t("fx.target")}</span>
               <select className="input" value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -112,10 +240,14 @@ export function EffectsPage() {
           </div>
         </div>
         <div className="chips" style={{ marginBottom: 14 }}>
-          {["all", "own", "screen", ...Object.keys(categories)].map((c) => (
-            <span key={c} className={"chip" + (cat === c ? " active" : "")} onClick={() => setCat(c)}>{t("fxcat." + c)}</span>
+          {filters.map((c) => (
+            <span key={c} className={"chip" + (cat === c ? " active" : "")} onClick={() => setCat(c)}>
+              {c === "fav" ? "★ " : ""}{t("fxcat." + c)}{c === "fav" && favs.length ? ` (${favs.length})` : ""}
+            </span>
           ))}
         </div>
+        {cat === "fav" && !favs.length && <p className="hint" style={{ marginBottom: 10 }}>{t("fx.favEmpty")}</p>}
+        {cat === "recent" && !recent.length && <p className="hint" style={{ marginBottom: 10 }}>{t("fx.recentEmpty")}</p>}
         {cat === "own" && <p className="hint" style={{ marginBottom: 10 }}>{t("ch.intro")}</p>}
         <div className="fx-grid">
           {(cat === "own" || (cat === "all" && !query)) && (
@@ -124,7 +256,7 @@ export function EffectsPage() {
               <span className="hint">{t("ch.newHint")}</span>
             </button>
           )}
-          {(cat === "all" || cat === "screen") && !query && (
+          {(cat === "all" || cat === "own") && !query && (
             <button className={"fx-card screen" + (running && screen ? " active" : "")} onClick={chooseScreen}>
               <span className="name"><Icon name="monitor" /> {t("fx.screen")}</span>
               <span className="bar" style={{ ["--fxbar" as string]: "linear-gradient(90deg,#1a3a8a,#e0702a,#2a9a5a,#7a2ac0)" }} />
@@ -136,7 +268,8 @@ export function EffectsPage() {
             const cols = [...new Set(c.steps.flatMap((s) => s.colors.filter(Boolean) as string[]))].slice(0, 6);
             const bar = cols.length > 1 ? `linear-gradient(90deg, ${cols.join(",")})` : cols[0] ?? "var(--line)";
             return (
-              <button key={c.id} className={"fx-card own" + (active ? " active" : "")} onClick={() => chooseChase(c)}>
+              <button key={c.id} className={"fx-card own" + (active ? " active" : "")} onClick={() => chooseChase(c)}
+                onPointerDown={onDrag ? (ev) => onDrag({ type: "effect", fx: effects[0], chase: { id: c.id, name: c.name } }, ev) : undefined}>
                 <span className="name">{c.name}</span>
                 <span className="bar" style={{ ["--fxbar" as string]: bar }} />
                 {active && <span className="badge">{t("fx.running")}</span>}
@@ -146,96 +279,21 @@ export function EffectsPage() {
           })}
           {list.map((e) => {
             const active = running && !chase && !screen && e.index === fx.effectIndex;
-            const bar = bars[e.key] ?? (e.swatch ? `linear-gradient(90deg,${e.swatch})` : e.key.includes("rainbow") || e.key === "disco" || e.key.startsWith("random-col") ? rainbow
-              : e.uses.includes("ColorB") ? `linear-gradient(90deg, ${fx.colorA}, ${fx.colorB})`
-              : e.uses.includes("ColorA") ? fx.colorA : rainbow);
             return (
-              <button key={e.key} className={"fx-card" + (active ? " active" : "") + (!running && e.index === fx.effectIndex ? " " : "")} onClick={() => choose(e)}>
+              <button key={e.key} className={"fx-card" + (active ? " active" : "")} onClick={() => choose(e)}
+                onPointerDown={onDrag ? (ev) => onDrag({ type: "effect", fx: e }, ev) : undefined}>
                 <span className="name">{name(e)}</span>
-                <span className="bar" style={{ ["--fxbar" as string]: bar }} />
+                {/* always the moving example (while on screen), in the current colours and speed */}
+                <FxPreview index={e.index} fx={fx} lamps={Math.min(8, Math.max(4, full!.rig.heads))} />
                 {active ? <span className="badge">{t("fx.running")}</span> : e.uses.includes("Audio") || e.uses.includes("Beat") ? <span className="fx-new">♪</span> : null}
+                <span className={"fx-fav" + (favs.includes(e.key) ? " on" : "")} role="button" aria-label={t("fx.fav")} title={t("fx.fav")}
+                  onClick={(ev) => { ev.stopPropagation(); toggleFav(e.key); }}>★</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="card palette-panel">
-        <div className="card-head">
-          <h2 className="grow">{screen ? t("fx.screen") : chase ? chase.name : current ? name(current) : ""}</h2>
-          <Help k="fx.panelHelp" />
-          {running
-            ? <button className="btn off active" onClick={stop}><Icon name="stop" /> {t("fx.stop")}</button>
-            : <button className="btn primary" onClick={() => send(fx, true)}><Icon name="play" /> {t("fx.start")}</button>}
-        </div>
-        {layers.length > 0 && (
-          <div className="stack" style={{ gap: 6, marginBottom: 14 }}>
-            <h3>{t("fx.layers")}</h3>
-            {layers.map((l) => (
-              <div key={l.groupId} className="layer-row">
-                <b>{groups.find((g) => g.id === l.groupId)?.name ?? "?"}</b>
-                <span className="grow muted">{layerName(l.effect)}</span>
-                <button className="btn sm" onClick={() => setTarget(l.groupId)}>⋯</button>
-                <button className="btn sm off" onClick={() => api.stopLayer(l.groupId)}>{t("fx.layerStop")}</button>
-              </div>
-            ))}
-            <p className="hint">{t("fx.layerHint")}</p>
-          </div>
-        )}
-        <h3 style={{ marginBottom: 8 }}>{t("fx.preview")}</h3>
-        <div className="preview-strip">
-          {(heads.length ? heads : ["#000000"]).map((h, i) => <div key={i} style={{ background: h }} />)}
-        </div>
-        {screen ? (
-          <div style={{ marginBottom: 14 }}><ScreenSyncPanel /></div>
-        ) : chase ? (
-          <div className="stack" style={{ marginBottom: 14 }}>
-            <p className="hint">{t("ch.panelHint")}</p>
-            <button className="btn" onClick={() => setEditing(chase)}><Icon name="edit" /> {t("ch.edit")}</button>
-          </div>
-        ) : (
-          <p className="hint" style={{ marginBottom: 14 }}>
-            {usedList.length ? t("fx.uses", { list: usedList.join(", ") }) : t("fx.usesNone")}
-          </p>
-        )}
-
-        {!chase && !screen && <div className="stack">
-          <div className="row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <ColorField label={t("fx.colorA")} value={fx.colorA} disabled={!uses.has("ColorA") || fx.colorPerLamp}
-              onPick={(hex) => send({ ...fx, colorA: hex })} />
-            <ColorField label={t("fx.colorB")} value={fx.colorB} disabled={!uses.has("ColorB")}
-              onPick={(hex) => send({ ...fx, colorB: hex })} />
-          </div>
-          <label className="check">
-            <input type="checkbox" checked={fx.colorPerLamp} disabled={!uses.has("ColorA")}
-              onChange={(e) => send({ ...fx, colorPerLamp: e.target.checked })} />
-            <span className="box" />
-            <span className={uses.has("ColorA") ? "" : "muted"}>{t("fx.perLamp")}</span>
-          </label>
-          {fx.colorPerLamp && uses.has("ColorA") && (
-            <div className="lampcolors">
-              {Array.from({ length: Math.max(full!.rig.heads, 1) }, (_, i) => {
-                const c = fx.lampColors[i] ?? "#FFFFFF";
-                return (
-                  <label key={i} className="colorbtn" style={{ background: c, color: contrast(c) }}>
-                    {i + 1}
-                    <ColorInput value={c} onPick={(hex) => {
-                      const lc = [...fx.lampColors];
-                      while (lc.length <= i) lc.push("#FFFFFF");
-                      lc[i] = hex;
-                      send({ ...fx, lampColors: lc });
-                    }} />
-                  </label>
-                );
-              })}
-            </div>
-          )}
-          <TimeParam label={t("fx.step")} value={fx.stepMs} min={40} max={5000} enabled={uses.has("Step")} onChange={(v) => send({ ...fx, stepMs: v })} />
-          <TimeParam label={t("fx.on")} value={fx.onMs} min={20} max={10000} enabled={uses.has("OnOff")} onChange={(v) => send({ ...fx, onMs: v })} />
-          <TimeParam label={t("fx.off")} value={fx.offMs} min={20} max={10000} enabled={uses.has("OnOff")} onChange={(v) => send({ ...fx, offMs: v })} />
-          <TimeParam label={t("fx.delay")} value={fx.delayMs} min={0} max={10000} enabled={uses.has("Delay")} onChange={(v) => send({ ...fx, delayMs: v })} />
-        </div>}
-      </div>
       {editing && <ChaseEditor key={editing.id} initial={editing} target={target} onClose={() => setEditing(null)} />}
     </div>
   );
@@ -250,6 +308,36 @@ function ColorField({ label, value, disabled, onPick }: { label: string; value: 
         <ColorInput value={value} onPick={onPick} />
       </span>
     </label>
+  );
+}
+
+/**
+ * One "speed" slider instead of four times: it makes every time the effect uses shorter or longer by the same
+ * factor, so the effect keeps its character (an even blink stays even). Slow on the left, fast on the right.
+ */
+function SpeedParam({ fx, uses, onChange, beat }: { fx: EffectSettings; uses: Set<EffectParam>; onChange: (fx: EffectSettings) => void; beat: boolean }) {
+  const t = useT();
+  // the time that sets the pace: the step, else one on/off cycle, else the delay
+  const base = uses.has("Step") ? fx.stepMs : uses.has("OnOff") ? fx.onMs + fx.offMs : Math.max(fx.delayMs, 20);
+  const lo = Math.log(40), hi = Math.log(5000);
+  const toPos = (ms: number) => Math.round((1 - (Math.log(Math.min(5000, Math.max(40, ms))) - lo) / (hi - lo)) * 1000);
+  const [pos, setPos] = useState(toPos(base));
+  useEffect(() => setPos(toPos(base)), [base]); // eslint-disable-line react-hooks/exhaustive-deps
+  const commit = () => {
+    const ms = Math.exp(lo + (1 - pos / 1000) * (hi - lo));
+    const f = ms / Math.max(1, base);
+    const sc = (v: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round((v * f) / 10) * 10));
+    onChange({ ...fx, stepMs: sc(fx.stepMs, 40, 5000), onMs: sc(fx.onMs, 20, 10000), offMs: sc(fx.offMs, 20, 10000), delayMs: fx.delayMs ? sc(fx.delayMs, 0, 10000) : 0 });
+  };
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <div className="param">
+        <span className="lbl">{t("fx.speed")}</span>
+        <input type="range" min={0} max={1000} value={pos} onChange={(e) => setPos(+e.target.value)} onPointerUp={commit} onKeyUp={commit} />
+        <span className="mono muted param-val">{(1000 / Math.max(1, base)).toFixed(base > 1000 ? 2 : 1)}/s</span>
+      </div>
+      {beat && <p className="hint">{t("fx.speedBeat")}</p>}
+    </div>
   );
 }
 

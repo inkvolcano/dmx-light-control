@@ -1,13 +1,16 @@
 using DmxLicht.Core;
 using DmxLicht.Core.Control;
 using DmxLicht.Core.Engine;
+#if WINDOWS
 using NAudio.Midi;
+#endif
 
 namespace DmxLicht.App;
 
 /// <summary>
 /// MIDI input: notes and controllers run their mapped commands. "Learn" captures the next message
 /// so the UI can link it. CC used as a button fires when it goes over half way (a press).
+/// Windows: NAudio (winmm). Linux: ALSA raw MIDI (<see cref="LinuxMidiIn"/>).
 /// </summary>
 sealed class MidiControl : IDisposable
 {
@@ -17,7 +20,11 @@ sealed class MidiControl : IDisposable
 
     readonly LightEngine engine;
     readonly object sync = new();
+#if WINDOWS
     MidiIn input;
+#else
+    LinuxMidiIn input;
+#endif
     string device;
     bool enabled;
     List<MidiMapping> mappings = new();
@@ -34,7 +41,11 @@ sealed class MidiControl : IDisposable
     public static List<string> Devices()
     {
         var list = new List<string>();
+#if WINDOWS
         try { for (int i = 0; i < MidiIn.NumberOfDevices; i++) list.Add(MidiIn.DeviceInfo(i).ProductName); }
+#else
+        try { list.AddRange(LinuxMidiIn.Ports().Select(p => p.Name)); }
+#endif
         catch (Exception ex) { Log.Write("MIDI-apparaten opvragen mislukt: " + ex.Message); }
         return list;
     }
@@ -54,8 +65,17 @@ sealed class MidiControl : IDisposable
             if (index < 0) { Error = "MIDI-apparaat niet gevonden: " + want; return; }
             try
             {
+#if WINDOWS
                 input = new MidiIn(index);
                 input.MessageReceived += OnMessage;
+#else
+                input = new LinuxMidiIn(LinuxMidiIn.Ports()[index].Path);
+                input.Received += m => Handle(new Message(m.Type, m.Channel, m.Number, m.Value));
+                input.Failed += why =>
+                {
+                    lock (sync) { Error = why; Log.Write("MIDI: " + why); Close(); }
+                };
+#endif
                 input.Start();
                 Error = null;
                 Log.Write("MIDI luistert naar " + want);
@@ -64,6 +84,7 @@ sealed class MidiControl : IDisposable
         }
     }
 
+#if WINDOWS
     void OnMessage(object sender, MidiInMessageEventArgs e)
     {
         Message m = e.MidiEvent switch
@@ -73,6 +94,12 @@ sealed class MidiControl : IDisposable
             _ => null,
         };
         if (m == null) return;
+        Handle(m);
+    }
+#endif
+
+    void Handle(Message m)
+    {
         Last = m;
         if (Learning) { Learned = m; Learning = false; return; }
 
@@ -114,7 +141,11 @@ sealed class MidiControl : IDisposable
     void Close()
     {
         if (input == null) return;
+#if WINDOWS
         try { input.Stop(); input.MessageReceived -= OnMessage; input.Dispose(); } catch { }
+#else
+        try { input.Stop(); input.Dispose(); } catch { }
+#endif
         input = null;
     }
 

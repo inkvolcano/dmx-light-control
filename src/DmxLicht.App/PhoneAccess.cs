@@ -64,6 +64,7 @@ static class PhoneAccess
     /// <summary>Whether our firewall rule exists (reading needs no admin rights).</summary>
     public static bool FirewallRuleExists(int port)
     {
+        if (!OperatingSystem.IsWindows()) return true;   // Raspberry Pi OS has no firewall by default (ufw: see LEESMIJ-Linux)
         try
         {
             var psi = new ProcessStartInfo("netsh", $"advfirewall firewall show rule name=\"{RuleName(port)}\"")
@@ -84,6 +85,7 @@ static class PhoneAccess
     /// </summary>
     public static async Task<string> OpenFirewallAsync(int port, int oscPort)
     {
+        if (!OperatingSystem.IsWindows()) return "unsupported";
         string name = RuleName(port), osc = "DmxLicht (OSC, UDP " + oscPort + ")", mdns = "DmxLicht (vaste naam, mDNS)";
         string exe = Environment.ProcessPath ?? "";
         string args = $"/c netsh advfirewall firewall delete rule name=\"{name}\" >nul 2>&1 & " +

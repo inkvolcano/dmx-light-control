@@ -2,7 +2,8 @@
 
   <!-- Engine without UI: lamp patch, effects, frame building, DMX output, storage. -->
   <PropertyGroup>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <!-- net9.0-windows: the Windows app (unchanged). net9.0: the Linux build (Raspberry Pi, linux-arm64). -->
+    <TargetFrameworks>net9.0-windows;net9.0</TargetFrameworks>
     <RootNamespace>DmxLicht.Core</RootNamespace>
   </PropertyGroup>
 

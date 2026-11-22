@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type ScreenSyncSettings } from "../api";
 import { useT } from "../i18n";
-import { useShow } from "../store";
+import { onLinux, useShow } from "../store";
 import { CameraFrameEditor } from "./CameraFrameEditor";
 import { EdgePreview } from "./EdgePreview";
 import { useLive } from "../store";
@@ -35,7 +35,10 @@ export function useScreenSync() {
     latest.current = next;
     return api.screenSync(next);
   };
-  return { set, info, cams, camera, save, lamps: Math.max(1, full!.rig.heads) };
+  // the webcam only runs while its picture is open here (or while the screen is being followed): opening this
+  // page never switches it on by itself
+  const [picture, setPicture] = useState(false);
+  return { set, info, cams, camera, save, lamps: Math.max(1, full!.rig.heads), picture, setPicture };
 }
 type ScreenSync = ReturnType<typeof useScreenSync>;
 
@@ -65,9 +68,13 @@ export function ScreenSource({ s }: { s: ScreenSync }) {
           </label>
           {cams && cams.length === 0 && <div className="note warn">{t("cam.none")}</div>}
           {info?.cameraError && <div className="note warn">{info.cameraError}</div>}
-          {isLocal()
-            ? <CameraFrameEditor corners={set.corners ?? [0.1, 0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9]} onChange={(c) => save({ corners: c })} />
-            : <p className="hint">{t("cam.onlyHere")}</p>}
+          {!isLocal() ? <p className="hint">{t("cam.onlyHere")}</p>
+            : s.picture ? (
+              <>
+                <CameraFrameEditor corners={set.corners ?? [0.1, 0.1, 0.9, 0.1, 0.9, 0.9, 0.1, 0.9]} onChange={(c) => save({ corners: c })} />
+                <button className="btn sm ghost" onClick={() => s.setPicture(false)}><Icon name="eye" /> {t("cam.hidePicture")}</button>
+              </>
+            ) : <CameraOff s={s} />}
           <ol className="steps">{[1, 2, 3, 4].map((i) => <li key={i}>{t("cam.step" + i)}</li>)}</ol>
         </>
       )}
@@ -189,7 +196,8 @@ export function PointsBlock({ s }: { s: ScreenSync }) {
   return (
     <div className="stack">
       <p className="hint">{t("pts.hint", { n: lamps })}</p>
-      <PointsEditor set={set} lamps={lamps} colors={heads} grid={info?.grid ?? null} onChange={(points) => save({ points })} />
+      {s.camera && !s.picture && isLocal() && <CameraOff s={s} />}
+      <PointsEditor set={set} lamps={lamps} colors={heads} grid={info?.grid ?? null} live={!s.camera || s.picture} onChange={(points) => save({ points })} />
       <div className="row" style={{ flexWrap: "wrap" }}>
         <label className="field grow">{t("pts.size", { n: set.pointSize ?? 8 })}
           <input type="range" min={1} max={30} defaultValue={set.pointSize ?? 8} key={"p" + (set.pointSize ?? 8)}
@@ -202,9 +210,22 @@ export function PointsBlock({ s }: { s: ScreenSync }) {
   );
 }
 
+/** The camera picture is closed: say so, with a button to open it (which switches the webcam on). */
+function CameraOff({ s }: { s: ScreenSync }) {
+  const t = useT();
+  return (
+    <div className="note">
+      <Icon name="eye" />
+      <span className="grow">{t("cam.pictureOff")}</span>
+      <button className="btn sm" onClick={() => s.setPicture(true)}>{t("cam.showPicture")}</button>
+    </div>
+  );
+}
+
 /** Compact version for the effects panel: a pointer to the Screen page, where the camera frame has room. */
 export function ScreenSyncPanel() {
   const t = useT();
+  if (onLinux()) return <p className="hint">{t("linux.noScreen")}</p>;
   return (
     <div className="stack">
       <p className="hint">{t("ss.hint")}</p>

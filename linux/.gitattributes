@@ -1,0 +1,2 @@
+# Shell scripts, the systemd unit and the udev rule run on Linux: always LF line endings
+* text eol=lf

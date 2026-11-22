@@ -23,22 +23,7 @@ public static class FrameBuilder
         switch (s.Mode)
         {
             case OutputMode.Static:
-                foreach (RigFixture fx in rig.Fixtures)
-                {
-                    if (!s.Looks.TryGetValue(fx.Patch.Id, out FixtureLook look) || !look.On)
-                    {
-                        // off: colours 0, but fixed channels and a shutter keep their resting value, so a fade
-                        // between off and on never sweeps a shutter through its strobe range (SGM P-2)
-                        WriteResting(f, fx);
-                        continue;
-                    }
-                    Light c = look.Color.Resolve().ToLight(s.UseWhiteLed);
-                    var colors = new Light[fx.CellCount];
-                    var levels = new double[fx.CellCount];
-                    Array.Fill(colors, c);
-                    Array.Fill(levels, 1.0);
-                    WriteFixture(f, rig, fx, colors, levels, master);
-                }
+                foreach (RigFixture fx in rig.Fixtures) WriteLook(f, rig, fx, s, master);
                 break;
 
             case OutputMode.Effect:
@@ -46,6 +31,8 @@ public static class FrameBuilder
                 LampOutput[] heads = RenderEffect(s, s.Effect, ms, rig.Heads.Count, audio);
                 foreach (RigFixture fx in rig.Fixtures)
                 {
+                    // a lamp given its own colour (for a selection) keeps it while the effect runs on the others
+                    if (s.Held?.Count > 0 && s.Held.Contains(fx.Patch.Id)) { WriteLook(f, rig, fx, s, master); continue; }
                     var colors = new Light[fx.CellCount];
                     var levels = new double[fx.CellCount];
                     for (int c = 0; c < fx.CellCount; c++)
@@ -73,8 +60,13 @@ public static class FrameBuilder
         foreach (EffectLayer layer in s.Layers)
         {
             if (layer?.GroupId == null) continue;
-            int[] members = layer.GroupId == "*" ? Enumerable.Range(0, rig.Fixtures.Count).ToArray()
-                          : rig.Groups.TryGetValue(layer.GroupId, out int[] g) ? g : null;
+            int[] members = layer.FixtureIds != null
+                ? Enumerable.Range(0, rig.Fixtures.Count).Where(i => layer.FixtureIds.Contains(rig.Fixtures[i].Patch.Id)).ToArray()
+                : layer.GroupId == "*" ? Enumerable.Range(0, rig.Fixtures.Count).ToArray()
+                : rig.Groups.TryGetValue(layer.GroupId, out int[] g) ? g : null;
+            // the user's effects leave held lamps alone (a flash or the timeline do not)
+            if (members != null && layer.Source == null && s.Held?.Count > 0)
+                members = members.Where(i => !s.Held.Contains(rig.Fixtures[i].Patch.Id)).ToArray();
             if (members == null || members.Length == 0) continue;
             int headCount = members.Sum(i => rig.Fixtures[i].CellCount);
             LampOutput[] heads = RenderEffect(s, layer.Effect, ms, headCount, audio);
@@ -112,6 +104,24 @@ public static class FrameBuilder
     /// level x master; multi-segment lamps: master, with each segment's level on its colours);
     /// otherwise it scales the colour channels.
     /// </summary>
+    /// <summary>One lamp in its own fixed colour (or off).</summary>
+    static void WriteLook(byte[] f, Rig rig, RigFixture fx, ShowState s, double master)
+    {
+        if (!s.Looks.TryGetValue(fx.Patch.Id, out FixtureLook look) || !look.On)
+        {
+            // off: colours 0, but fixed channels and a shutter keep their resting value, so a fade
+            // between off and on never sweeps a shutter through its strobe range (SGM P-2)
+            WriteResting(f, fx);
+            return;
+        }
+        Light c = look.Color.Resolve().ToLight(s.UseWhiteLed);
+        var colors = new Light[fx.CellCount];
+        var levels = new double[fx.CellCount];
+        Array.Fill(colors, c);
+        Array.Fill(levels, 1.0);
+        WriteFixture(f, rig, fx, colors, levels, master);
+    }
+
     /// <summary>A library effect, or the user's own chase when <see cref="EffectSettings.ChaseId"/> is set.</summary>
     static LampOutput[] RenderEffect(ShowState s, EffectSettings e, long ms, int heads, AudioFrame audio)
     {

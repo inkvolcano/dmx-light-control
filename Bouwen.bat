@@ -32,7 +32,7 @@ dotnet test --nologo -v q -p:Version=%VERSION% || goto fail
 
 echo [3/5] App publiceren (zelfstandig, win-x64)...
 if exist %STAGE% rmdir /s /q %STAGE%
-dotnet publish src\DmxLicht.App -c Release -r win-x64 --self-contained true ^
+dotnet publish src\DmxLicht.App -f net9.0-windows -c Release -r win-x64 --self-contained true ^
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true ^
   -p:DebugType=none -p:Version=%VERSION% -o %STAGE% --nologo -v q || goto fail
 copy /y LEESMIJ.txt %STAGE%\ >nul

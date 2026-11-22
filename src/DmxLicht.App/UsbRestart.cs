@@ -18,6 +18,8 @@ static class UsbRestart
     /// </summary>
     public static async Task<string> DisablePowerSavingAsync(IReadOnlyList<string> instanceIds)
     {
+        // Linux: the udev rule (60-udmx.rules) already keeps the dongle's USB power on
+        if (!OperatingSystem.IsWindows()) return "unsupported";
         string ids = string.Join(",", instanceIds.Select(i => "'" + i.Replace("'", "''") + "'"));
         string ps = $$"""
             $ErrorActionPreference = 'SilentlyContinue'
@@ -70,6 +72,8 @@ static class UsbRestart
     /// <summary>"ok", "cancelled" or an error text.</summary>
     public static async Task<string> RestartAsync(IReadOnlyList<string> instanceIds)
     {
+        // Linux: the normal "USB herstellen" already resets the port through libusb
+        if (!OperatingSystem.IsWindows()) return "unsupported";
         // pnputil /restart-device exists from Windows 10 2004; older: disable + enable
         string script = string.Join(" & ", instanceIds.Select(id =>
             $"(pnputil /restart-device \"{id}\" || (pnputil /disable-device \"{id}\" & pnputil /enable-device \"{id}\"))"));

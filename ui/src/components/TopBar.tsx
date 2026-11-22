@@ -4,7 +4,44 @@ import { useT } from "../i18n";
 import { useLive, useShow } from "../store";
 import { Icon } from "./Icon";
 
-export function TopBar() {
+/** The bar over every page. With the right column shown, tempo and "what runs" live there instead of here. */
+// fade: 0 to 30 s on a curve, so short fades get most of the slider (0 = direct)
+const fadeToPos = (ms: number) => Math.round(Math.sqrt(Math.min(30000, Math.max(0, ms)) / 30000) * 1000);
+const posToFade = (p: number) => { const ms = Math.pow(p / 1000, 2) * 30000; return ms < 50 ? 0 : ms < 2000 ? Math.round(ms / 50) * 50 : Math.round(ms / 100) * 100; };
+
+/** A small slider in the top bar: drag, the value shows next to it; follows changes from elsewhere when not dragged. */
+function DragValue({ label, title, value, range, toPos, fromPos, show, onChange }: {
+  label: string; title: string; value: number; range: [number, number];
+  toPos: (v: number) => number; fromPos: (p: number) => number; show: (v: number) => string; onChange: (v: number) => void;
+}) {
+  const [v, setV] = useState(value);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => { if (!dragging) setV(value); }, [value, dragging]);
+  return (
+    <div className="master drag-value" title={title}>
+      <label>{label}</label>
+      <input type="range" min={range[0]} max={range[1]} value={toPos(v)}
+        onPointerDown={() => setDragging(true)} onPointerUp={() => setDragging(false)} onBlur={() => setDragging(false)}
+        onChange={(e) => { const n = fromPos(+e.target.value); setV(n); onChange(n); }} />
+      <span className="val">{show(v)}</span>
+    </div>
+  );
+}
+
+/** The strobe speed as a thin bar inside the strobe button (follows changes from elsewhere when not dragged). */
+function StrobeSpeed({ value, onChange, title }: { value: number; onChange: (v: number) => void; title: string }) {
+  const [v, setV] = useState(value);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => { if (!dragging) setV(value); }, [value, dragging]);
+  return (
+    <input className="strobe-speed" type="range" min={1} max={100} value={v} title={title + ": " + v} aria-label={title}
+      style={{ ["--fill" as string]: v + "%" }}
+      onPointerDown={() => setDragging(true)} onPointerUp={() => setDragging(false)} onBlur={() => setDragging(false)}
+      onChange={(e) => { const n = +e.target.value; setV(n); onChange(n); }} />
+  );
+}
+
+export function TopBar({ rail }: { rail: boolean }) {
   const t = useT();
   const { full } = useShow();
   const { output, music } = useLive();
@@ -35,6 +72,8 @@ export function TopBar() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const send = useMemo(() => throttle((v: number) => api.master({ brightness: v })), []);
+  const sendFade = useMemo(() => throttle((ms: number) => api.master({ fadeMs: ms })), []);
+  const sendStrobe = useMemo(() => throttle((v: number) => api.strobe({ speed: v })), []);
 
   useEffect(() => {
     if (!dragging && s) setBright(s.brightnessPercent);
@@ -48,32 +87,47 @@ export function TopBar() {
 
   return (
     <header className="topbar">
-      <button className={"btn lg on" + (allOn ? " active" : "")} onClick={() => api.looks([], true)}>
+      <button className={"btn lg on" + (allOn ? " active" : "")} title={t("top.onHint")} onClick={() => api.looks([], true)}>
         <Icon name="power" /> {t("top.on")}
       </button>
-      <button className={"btn lg off" + (allOff ? " active" : "")} onClick={() => api.looks([], false)}>
-        {t("top.off")}
-      </button>
-      <div className="master">
-        <label>{t("top.master")}</label>
-        <input type="range" min={0} max={100} value={bright}
-          onPointerDown={() => setDragging(true)} onPointerUp={() => setDragging(false)}
-          onChange={(e) => { const v = +e.target.value; setBright(v); send(v); }} />
-        <span className="val">{bright}%</span>
+      {/* off and blackout as one two-part button: off (left) switches the lamps off, blackout (right) darkens for a moment */}
+      <div className="combo">
+        <button className={"btn lg off" + (allOff ? " active" : "")} title={t("top.offHint")} onClick={() => api.looks([], false)}>
+          {t("top.off")}
+        </button>
+        <button className={"btn lg blackout" + (s.blackout ? " active" : "")} title={t(s.blackout ? "top.blackoutOnHint" : "top.blackoutHint")} onClick={() => api.master({ blackout: !s.blackout })}>
+          <Icon name="moon" /> {s.blackout ? t("top.blackoutOn") : t("top.blackout")}
+        </button>
       </div>
-      <button className={"btn blackout" + (s.blackout ? " active" : "")} onClick={() => api.master({ blackout: !s.blackout })}>
-        <Icon name="moon" /> {t("top.blackout")}
-      </button>
-      <button className={"btn strobe" + (strobing ? " active" : "")} title={t("top.strobeHint")}
-        onPointerDown={(e) => { (e.target as Element).setPointerCapture?.(e.pointerId); strobe(true); }}
-        onPointerUp={() => strobe(false)} onPointerCancel={() => strobe(false)}
-        onContextMenu={(e) => e.preventDefault()}>
-        <Icon name="bolt" /> {t("top.strobe")}
-      </button>
+      {/* brightness, transition and strobe speed: three small sliders under each other */}
+      <div className="top-sliders">
+        <div className="master">
+          <label>{t("top.master")}</label>
+          <input type="range" min={0} max={100} value={bright}
+            onPointerDown={() => setDragging(true)} onPointerUp={() => setDragging(false)}
+            onChange={(e) => { const v = +e.target.value; setBright(v); send(v); }} />
+          <span className="val">{bright}%</span>
+        </div>
+        <DragValue label={t("live.fade")} title={t("top.fadeHint")} value={s.fadeMs} range={[0, 1000]}
+          toPos={fadeToPos} fromPos={posToFade} show={(ms) => (ms === 0 ? t("live.fadeNone") : (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + " s")} onChange={sendFade} />
+      </div>
+      {/* strobe: hold the button; its speed is the thin bar inside it */}
+      <div className={"strobe-box" + (strobing ? " active" : "")}>
+        <button className={"btn strobe" + (strobing ? " active" : "")} title={t("top.strobeHint")}
+          onPointerDown={(e) => { (e.target as Element).setPointerCapture?.(e.pointerId); strobe(true); }}
+          onPointerUp={() => strobe(false)} onPointerCancel={() => strobe(false)}
+          onContextMenu={(e) => e.preventDefault()}>
+          <Icon name="bolt" /> {t("top.strobe")}
+        </button>
+        <StrobeSpeed value={s.strobeSpeed} onChange={sendStrobe} title={t("live.strobeSpeed")} />
+      </div>
       <div className="grow" />
+      <button className="btn ghost search-btn" title={t("cmd.title") + " (Ctrl+K)"} onClick={() => window.dispatchEvent(new Event("dmx-search"))}>
+        <Icon name="search" /> <span className="search-label">{t("cmd.short")}</span> <kbd>Ctrl K</kbd>
+      </button>
       <button className="btn ghost icon-btn" title={t("top.undo")} disabled={!full.undo} onClick={() => api.undo()}><Icon name="undo" /></button>
       <button className="btn ghost icon-btn" title={t("top.redo")} disabled={!full.redo} onClick={() => api.redo()}><Icon name="redo" /></button>
-      {(s.music.syncEffects || s.music.modulation !== "none" || s.music.enabled) && (
+      {!rail && (s.music.syncEffects || s.music.modulation !== "none" || s.music.enabled) && (
         <span className="chip bpm-chip" title="TAP" onClick={() => api.tap()}>
           <span className="dot" style={{ opacity: 1 - (music.beat - Math.floor(music.beat)) * 0.85 }} />
           {music.bpm.toFixed(0)} BPM
@@ -81,17 +135,17 @@ export function TopBar() {
       )}
       {update && <span className="chip ok clickable" title={t("upd.chipHint")} onClick={() => { try { localStorage.setItem("page", "settings"); } catch { /* ignore */ } location.reload(); }}>
         <span className="dot" />{t("upd.chip", { v: update })}</span>}
-      <span className="chip mode">{t("top.mode." + s.mode)}</span>
-      <span className={"chip clickable " + (output.connected ? "ok" : "warn")}
-        title={(output.connected ? "" : t("fault." + (output.fault ?? "Other")) + " - ") + t("usb.recover")} onClick={() => {
+      {!rail && <span className="chip mode">{t("top.mode." + s.mode)}</span>}
+      <span className={"chip clickable out-chip " + (output.connected ? "ok" : "warn")}
+        title={(output.connected
+          ? t("status.connected", { name: output.name }) + (output.reconnects ? ` · ${output.reconnects}×` : "") + "\n"
+          : t("fault." + (output.fault ?? "Other")) + "\n") + t("usb.recover")} onClick={() => {
           if (recovering) return;   // one recover at a time (each takes up to a few seconds)
           setRecovering(true);
           api.recover(false).catch(() => {}).finally(() => setRecovering(false));
         }}>
         <span className={"dot" + (recovering ? " busy" : "")} />
-        {output.connected
-          ? t("status.connected", { name: output.name }) + (output.reconnects ? ` · ${output.reconnects}×` : "")
-          : t("faultShort." + (output.fault ?? "Other"), { name: output.name })}
+        {output.connected ? output.name : t("faultShort." + (output.fault ?? "Other"), { name: output.name })}
       </span>
     </header>
   );

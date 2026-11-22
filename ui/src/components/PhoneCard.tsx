@@ -4,6 +4,7 @@ import { useT } from "../i18n";
 import { Help } from "./Help";
 import { Icon } from "./Icon";
 import { QrCode } from "./QrCode";
+import { onLinux } from "../store";
 
 interface PhoneInfo {
   allowNetwork: boolean; port: number; hostname: string; firewall: boolean; fixedName: string; fixedNameStatus: string;
@@ -108,14 +109,14 @@ export function PhoneCard({ settings, save }: { settings: AppSettings; save: (c:
               : t("phone.noneYet")}</span>
           </div>
 
-          <div className="stack" style={{ gap: 6 }}>
+          {!onLinux() && <div className="stack" style={{ gap: 6 }}>
             <div className="row">
               <span className="grow">{info.firewall ? "✓ " + t("phone.fwOk") : t("phone.fwMissing")}</span>
               {!info.firewall && <button className="btn sm" onClick={firewall}><Icon name="lock" /> {t("phone.fwButton")}</button>}
               <Help k="phone.fwHelp" />
             </div>
             {fw && <p className="hint">{fw}</p>}
-          </div>
+          </div>}
 
           <div className="stack" style={{ gap: 6 }}>
             <label className="check">

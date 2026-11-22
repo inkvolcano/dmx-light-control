@@ -19,6 +19,9 @@ static class Updater
     /// <summary>Release zip names, newest first: DMX-Light-Control-&lt;version&gt;.zip since 2.1.17, DmxLicht-&lt;version&gt;.zip before.</summary>
     static readonly string[] ZipPrefixes = { "DMX-Light-Control-", "DmxLicht-" };
     static readonly HttpClient http = CreateClient();
+    /// <summary>Windows: ".zip". Linux: "-linux-arm64.tar.gz" (or -linux-x64), the package Bouwen-Linux.bat makes.</summary>
+    static readonly string Suffix = OperatingSystem.IsWindows() ? ".zip"
+        : "-linux-" + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant() + ".tar.gz";
 
     public sealed record Release(string Version, string Notes, string Url, string ZipUrl, string ShaUrl, DateTime? Published);
 
@@ -75,8 +78,8 @@ static class Updater
             string zip = null, sha = null;
             foreach (string prefix in ZipPrefixes)
             {
-                string z = assets.FirstOrDefault(a => a.name.Equals($"{prefix}{version}.zip", StringComparison.OrdinalIgnoreCase)).url;
-                string s = assets.FirstOrDefault(a => a.name.Equals($"{prefix}{version}.zip.sha256", StringComparison.OrdinalIgnoreCase)).url;
+                string z = assets.FirstOrDefault(a => a.name.Equals($"{prefix}{version}{Suffix}", StringComparison.OrdinalIgnoreCase)).url;
+                string s = assets.FirstOrDefault(a => a.name.Equals($"{prefix}{version}{Suffix}.sha256", StringComparison.OrdinalIgnoreCase)).url;
                 if (z != null && s != null) { zip = z; sha = s; break; }
             }
             Latest = new Release(version, j.TryGetProperty("body", out var b) ? b.GetString() : "", j.GetProperty("html_url").GetString(), zip, sha,
@@ -97,6 +100,14 @@ static class Updater
     public static async Task InstallAsync(Action exitApp)
     {
         if (State is "downloading" or "installing") return;
+        if (!OperatingSystem.IsWindows())
+        {
+            // the program folder belongs to root (/opt/dmx-light-control); the service cannot replace itself
+            State = "error";
+            Error = "Automatisch bijwerken kan niet op Linux: download DMX-Light-Control-<versie>" + Suffix +
+                    " en draai sudo ./install.sh (zie LEESMIJ-Linux.txt) / Automatic install is not available on Linux";
+            return;
+        }
         try
         {
             Release rel = Latest ?? await CheckAsync();

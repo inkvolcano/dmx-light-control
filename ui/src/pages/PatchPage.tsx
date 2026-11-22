@@ -11,6 +11,7 @@ import { Help } from "../components/Help";
 import { Icon } from "../components/Icon";
 import { useT } from "../i18n";
 import { reloadBootstrap, useShow } from "../store";
+import { toast } from "../components/Toast";
 
 type CardState = Record<string, { mode: string; count: number }>;
 
@@ -193,7 +194,7 @@ function PatchList({ full, lib, message }: { full: FullState; lib: FixtureType[]
                         ...mine.map((c) => t("patch.conflict", { name: byId[c.fixtureA === p.id ? c.fixtureB : c.fixtureA]?.name ?? "?", from: c.from, to: c.to })),
                       ]}
                       onChange={(ch) => update(p.id, ch)}
-                      onRemove={() => api.removeFixtures([p.id])} />
+                      onRemove={() => { api.removeFixtures([p.id]); toast(t("toast.fixtureRemoved", { name: p.name })); }} />
                   );
                 })}
               </tbody>

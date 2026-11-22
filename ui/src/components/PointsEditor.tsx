@@ -24,9 +24,11 @@ export function pointsFor(set: ScreenSyncSettings, n: number): number[] {
  * lamp should take. The square shows the measured area; the marker is filled with the lamp's live colour.
  * On this PC the background is a live picture of what screen sync sees; elsewhere the small colour grid.
  */
-export function PointsEditor({ set, lamps, colors, grid, onChange }: {
+export function PointsEditor({ set, lamps, colors, grid, live = true, onChange }: {
   set: ScreenSyncSettings; lamps: number; colors: string[];
   grid: { width: number; height: number; cells: string[] } | null;
+  /** false: no live picture (it would switch the webcam on); the colour grid instead */
+  live?: boolean;
   onChange: (points: number[]) => void;
 }) {
   const t = useT();
@@ -45,7 +47,7 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
 
   // live picture: next one only after the previous arrived
   useEffect(() => {
-    if (!local) return;
+    if (!local || !live) { setSrc(null); return; }
     let alive = true, url: string | null = null;
     setSrc(null); setError(null);   // a new source: never keep showing the old picture
     (async () => {
@@ -64,7 +66,7 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
       }
     })();
     return () => { alive = false; if (url) URL.revokeObjectURL(url); };
-  }, [local, set.source, set.monitor, (set.corners ?? []).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [local, live, set.source, set.monitor, (set.corners ?? []).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // arrow keys move the selected marker (Shift = bigger steps)
   useEffect(() => {
@@ -128,7 +130,7 @@ export function PointsEditor({ set, lamps, colors, grid, onChange }: {
   return (
     <div className="stack" style={{ gap: 6 }}>
       <div className="cam-frame pts-frame" ref={box} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerDown={place}>
-        {local && src
+        {local && live && src
           ? <img src={src} alt="" draggable={false} />
           : grid && grid.width > 0
             ? <div className="pts-grid" style={{ gridTemplateColumns: `repeat(${grid.width}, 1fr)` }}>

@@ -32,7 +32,8 @@ static class Api
     /// <summary>Null when the request comes from this PC, else a 403 (things only the PC itself may do).</summary>
     static IResult LocalOnly(HttpContext ctx) =>
         ctx.Connection.RemoteIpAddress is { } ip && System.Net.IPAddress.IsLoopback(ip) ? null : Results.Text("only on this PC", statusCode: 403);
-    public sealed record TemplatesRequest(string[] Keys, Dictionary<string, string> Names);
+    /// <summary>Ready-made scenes to add; with Ids (the lamps chosen on the stage) spread over those lamps only.</summary>
+    public sealed record TemplatesRequest(string[] Keys, Dictionary<string, string> Names, string[] Ids);
     public sealed record PinRequest(string Pin, string NewPin, bool? Locked);
     public sealed record NameRequest(string Name);
     public sealed record StrobeRequest(bool? Active, int? Speed);
@@ -42,6 +43,10 @@ static class Api
     public sealed record SeekRequest(double Ms);
     public sealed record GroupRequest(string Id, string Name, string[] FixtureIds);
     public sealed record IdRequest(string Id);
+    /// <summary>A scene, optionally for some lamps only (the selection on the stage).</summary>
+    public sealed record SceneRecallRequest(string Id, string[] Ids);
+    /// <summary>An effect for the lamps chosen on the stage; no effect = stop it on those lamps.</summary>
+    public sealed record SelectionEffectRequest(string[] Ids, EffectSettings Effect);
     public sealed record LayerRequest(string GroupId, EffectSettings Effect);
     public sealed record SceneRequest(string Id, string Name, string Color, int? FadeMs, bool Capture);
 
@@ -485,15 +490,21 @@ static class Api
         {
             Live(engine, s =>
             {
-                var ids = r.Ids is { Length: > 0 } ? r.Ids : s.Patch.Select(p => p.Id).ToArray();
+                bool all = r.Ids is not { Length: > 0 };
+                var ids = all ? s.Patch.Select(p => p.Id).ToArray() : r.Ids.Where(id => s.Patch.Any(p => p.Id == id)).ToArray();
                 foreach (string id in ids)
                 {
                     FixtureLook l = s.State.Look(id);
                     if (r.On is bool on) l.On = on;
                     if (r.Color != null) l.Color = r.Color;
                 }
-                // like v1.4: on/off switches to static colours; picking a colour alone leaves a running effect alone
-                if (r.On != null) s.State.Mode = OutputMode.Static;
+                if (all)
+                {
+                    // like v1.4: on/off switches to static colours; picking a colour alone leaves a running effect alone
+                    if (r.On != null) { s.State.Mode = OutputMode.Static; Selection.Clear(s.State); }
+                }
+                // some lamps: only they change; an effect keeps running on the others
+                else if (r.On != null || r.Color != null) Selection.Hold(s.State, ids);
             });
             return Results.Ok();
         });
@@ -510,7 +521,7 @@ static class Api
             return Results.Ok();
         });
 
-        api.MapPost("/mode", (ModeRequest r) => { Live(engine, s => s.State.Mode = r.Mode); return Results.Ok(); });
+        api.MapPost("/mode", (ModeRequest r) => { Live(engine, s => { s.State.Mode = r.Mode; Selection.Clear(s.State); }); return Results.Ok(); });
 
         api.MapPost("/effect", (EffectRequest r) =>
         {
@@ -520,9 +531,20 @@ static class Api
             Live(engine, s =>
             {
                 s.State.Effect = r.Effect;
-                if (start) s.State.Mode = OutputMode.Effect;
+                // started for everyone: no lamps held to their own colour, no scene effects on a selection
+                if (start) { s.State.Mode = OutputMode.Effect; Selection.Clear(s.State); }
             });
             return Results.Ok();
+        });
+
+        // moving example on an effect tile: the current colours and times, another effect
+        api.MapGet("/effects/preview", (int index, int? lamps) =>
+        {
+            if (index < 0 || index >= EffectLibrary.All.Count) return Results.NotFound();
+            EffectSettings fx = SceneOps.Clone(engine.Read(s => s.State.Effect) ?? new EffectSettings());
+            fx.EffectIndex = index; fx.ChaseId = null; fx.ScreenSync = false;
+            Clean(fx);
+            return Results.Json(Preview.EffectFrames(fx, lamps ?? 4, 75, 40), Json.Compact);
         });
 
         // ---------- own chases (chase editor) ----------
@@ -599,6 +621,23 @@ static class Api
             {
                 s.State.Layers.RemoveAll(l => l.GroupId == r.GroupId);
                 s.State.Layers.Add(new EffectLayer { GroupId = r.GroupId, Effect = r.Effect });
+                // lamps of the group that were held to their own colour now show the group's effect
+                FixtureGroup g = s.Groups.FirstOrDefault(x => x.Id == r.GroupId);
+                if (g != null) Selection.Unhold(s.State, g.FixtureIds);
+                else if (r.GroupId == "*") s.State.Held.Clear();
+            });
+            return Results.Ok();
+        });
+        api.MapPost("/layers/selection", (SelectionEffectRequest r) =>
+        {
+            if (r.Ids is not { Length: > 0 }) return Results.BadRequest();
+            if (r.Effect != null) Clean(r.Effect);
+            Live(engine, s =>
+            {
+                string[] ids = r.Ids.Where(id => s.Patch.Any(p => p.Id == id)).Distinct().ToArray();
+                if (ids.Length == 0) return;
+                if (r.Effect == null) Selection.StopEffect(s.State, ids);
+                else Selection.StartEffect(s.State, ids, r.Effect);
             });
             return Results.Ok();
         });
@@ -613,20 +652,28 @@ static class Api
         api.MapPost("/scene-templates/add", (TemplatesRequest r) =>
         {
             int added = 0, skipped = 0;
+            var sceneIds = new List<string>();
             engine.Change(s =>
             {
                 List<string> ids = s.Patch.Select(p => p.Id).ToList();
+                // chosen lamps (not all): the example is spread over those, the rest keeps what it does now
+                List<string> some = (r.Ids ?? Array.Empty<string>()).Where(ids.Contains).Distinct().ToList();
+                bool subset = some.Count > 0 && some.Count < ids.Count;
                 foreach (string key in r.Keys ?? Array.Empty<string>())
                 {
                     SceneTemplate t = SceneTemplates.Find(key);
                     if (t == null) continue;
                     string name = r.Names != null && r.Names.TryGetValue(key, out string n) && !string.IsNullOrWhiteSpace(n) ? n.Trim() : t.Name;
-                    if (s.Scenes.Any(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))) { skipped++; continue; }
-                    s.Scenes.Add(new Scene { Name = name, Color = t.Color, FadeMs = t.FadeMs, State = t.Build(ids) });
+                    Scene have = s.Scenes.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+                    if (have != null) { skipped++; sceneIds.Add(have.Id); continue; }
+                    var sc = new Scene { Name = name, Color = t.Color, FadeMs = t.FadeMs,
+                        State = subset ? Selection.TemplateOn(t.Build(some), s.State, some) : t.Build(ids) };
+                    s.Scenes.Add(sc);
+                    sceneIds.Add(sc.Id);
                     added++;
                 }
             });
-            return Results.Ok(new { added, skipped });
+            return Results.Ok(new { added, skipped, sceneIds });
         });
 
         // ---------- scenes ----------
@@ -649,11 +696,17 @@ static class Api
             });
             return Results.Ok(new { id });
         });
-        api.MapPost("/scenes/recall", (IdRequest r) =>
+        api.MapPost("/scenes/recall", (SceneRecallRequest r) =>
         {
             Scene sc = engine.Read(s => s.Scenes.FirstOrDefault(x => x.Id == r.Id));
             if (sc == null) return Results.NotFound();
-            engine.Change(s => { SceneOps.Apply(sc.State, s.State); s.State.ActiveScene = sc.Id; }, fade: sc.FadeMs);
+            engine.Change(s =>
+            {
+                string[] ids = (r.Ids ?? Array.Empty<string>()).Where(id => s.Patch.Any(p => p.Id == id)).Distinct().ToArray();
+                // lamps chosen on the stage (not all of them): the scene for those lamps only
+                if (ids.Length > 0 && ids.Length < s.Patch.Count) Selection.ApplyScene(sc, s.State, ids);
+                else { SceneOps.Apply(sc.State, s.State); s.State.ActiveScene = sc.Id; }
+            }, fade: sc.FadeMs);
             return Results.Ok();
         });
         api.MapPost("/scenes/remove", (IdRequest r) =>
@@ -739,6 +792,9 @@ static class Api
                 settings.Devices = s.Settings.Devices;   // managed by the pairing endpoints only
                 settings.Mqtt ??= s.Settings.Mqtt ?? new MqttSettings();
                 settings.HiddenPages = (settings.HiddenPages ?? new()).Where(p => !string.IsNullOrWhiteSpace(p) && p != "settings").Distinct().Take(50).ToList();
+                // four buttons, each a scene id or empty
+                if (settings.RailScenes != null)
+                    settings.RailScenes = settings.RailScenes.Take(4).Select(id => id is { Length: > 0 and <= 64 } ? id : "").ToList();
                 if (settings.Mqtt.Password == null) settings.Mqtt.Password = s.Settings.Mqtt?.Password;   // UI never has it
                 return 0;
             });
@@ -1132,6 +1188,8 @@ static class Api
     static object Bootstrap(LightEngine engine) => new
     {
         version = typeof(Api).Assembly.GetName().Version?.ToString(3),
+        // the UI hides what only works on Windows (screen sync, songs, firewall, USB power, self-update)
+        platform = OperatingSystem.IsWindows() ? "windows" : "linux",
         library = engine.Library.Types.OrderBy(t => t.Custom).ThenBy(t => t.Category == "generic").ThenBy(t => t.Manufacturer).ThenBy(t => t.Model),
         palette = new
         {

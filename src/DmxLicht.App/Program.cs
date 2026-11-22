@@ -12,8 +12,10 @@ namespace DmxLicht.App;
 
 /// <summary>
 /// Starts the engine and a local web server, then shows the UI in a window (WebView2).
-/// Options: --browser (open in the default browser instead of a window), --headless (no window at all).
-/// Everything is stored in the "Instellingen" folder next to the exe, so the folder is portable.
+/// Options: --browser (open in the default browser instead of a window), --headless (no window at all),
+/// --network (always reachable from the network, for a headless computer such as a Raspberry Pi).
+/// Everything is stored in the "Instellingen" folder next to the exe, so the folder is portable
+/// (DMXLICHT_DATA moves it, see <see cref="Log.Dir"/>). The Linux build is always headless.
 /// </summary>
 static class Program
 {
@@ -65,8 +67,13 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+#if WINDOWS
         bool headless = args.Contains("--headless");
         bool browser = args.Contains("--browser");
+#else
+        const bool headless = true;    // Linux: no window; the UI is the web page (phone, tablet or a browser)
+#endif
+        bool network = args.Contains("--network");
 
         // One DmxLicht per PC: two programs sending to one dongle make it drop out.
         using var single = new Mutex(true, @"Local\DmxLicht.Output", out bool firstInstance);
@@ -74,14 +81,20 @@ static class Program
         {
             const string msg = "DMX Light Control draait al op deze pc (kijk in de taakbalk of bij de klok).\n" +
                                "DMX Light Control is already running on this PC.";
+#if WINDOWS
             if (headless) Console.Error.WriteLine(msg);
             else MessageBox.Show(msg, "DMX Light Control", MessageBoxButtons.OK, MessageBoxIcon.Information);
+#else
+            Console.Error.WriteLine(msg);
+#endif
             return;
         }
 
+#if WINDOWS
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         // every crash lands in Instellingen\Crashes (and in the problem report)
         Application.ThreadException += (_, e) => Log.Crash("venster", e.Exception);
+#endif
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Crash(e.IsTerminating ? "app (afgesloten)" : "app", e.ExceptionObject);
         TaskScheduler.UnobservedTaskException += (_, e) => { Log.Crash("achtergrondtaak", e.Exception); e.SetObserved(); };
         Log.Write("DMX Light Control " + Log.AppVersion + " start op " + Environment.OSVersion);
@@ -90,6 +103,11 @@ static class Program
         AppHealth.StartStallWatch();
 
         ShowFile show = LoadShow();
+        if (network && !show.Settings.AllowNetwork)
+        {
+            show.Settings.AllowNetwork = true;    // --network: what the settings show matches what really happens
+            try { show.Save(ShowFile.DefaultPath); } catch (Exception ex) { Log.Write("Opslaan mislukt: " + ex.Message); }
+        }
         var udmx = new UdmxOutput { MinIntervalMs = show.Settings.DongleIntervalMs };
         var output = new MultiOutput(udmx);
         output.Apply(show.Settings.Outputs ?? new OutputSettings());
@@ -119,15 +137,15 @@ static class Program
         Screen = screenSampler;
         using var homeAssistant = new HomeAssistant(engine);
         using var mdns = new MdnsResponder();
-        mdns.Apply(show.Settings.AllowNetwork, show.Settings.HostName);
-        engine.Changed += () => { var st = engine.Show.Settings; mdns.Apply(st.AllowNetwork, st.HostName); };
+        mdns.Apply(show.Settings.AllowNetwork || network, show.Settings.HostName);
+        engine.Changed += () => { var st = engine.Show.Settings; mdns.Apply(st.AllowNetwork || network, st.HostName); };
         using var audio = new AudioInput(engine);
         audio.Apply(show.State.Music);
         engine.Changed += () => audio.Apply(engine.Read(s => s.State.Music));
 
         int port = FreePort(show.Settings.Port);
         webPort = port;
-        rebuildWeb = allow => BuildWeb(engine, output, audio, allow, port);
+        rebuildWeb = allow => BuildWeb(engine, output, audio, allow || network, port);
         web = rebuildWeb(show.Settings.AllowNetwork);
         web.StartAsync().GetAwaiter().GetResult();
         engine.Start();
@@ -144,6 +162,7 @@ static class Program
             }
         });
         Log.Write("Gestart op " + url);
+        if (!OperatingSystem.IsWindows()) ShowPairingCode();
 
         try
         {
@@ -153,8 +172,13 @@ static class Program
                 var done = new ManualResetEventSlim();
                 ExitApp = done.Set;
                 Console.CancelKeyPress += (_, e) => { e.Cancel = true; done.Set(); };
+                // Linux: "systemctl stop" sends SIGTERM; stop the same clean way (show saved, light off)
+                using var term = OperatingSystem.IsWindows() ? null
+                    : System.Runtime.InteropServices.PosixSignalRegistration.Create(System.Runtime.InteropServices.PosixSignal.SIGTERM,
+                        c => { c.Cancel = true; done.Set(); });
                 done.Wait();
             }
+#if WINDOWS
             else if (browser)
             {
                 OpenInBrowser(url);
@@ -170,6 +194,7 @@ static class Program
                 ExitApp = () => invoker.BeginInvoke(Application.Exit);
                 Application.Run(new MainWindow(url));
             }
+#endif
         }
         finally
         {
@@ -180,6 +205,21 @@ static class Program
             saver.Flush();
             web.StopAsync().GetAwaiter().GetResult();
         }
+    }
+
+    /// <summary>
+    /// Linux (no screen of its own): the pairing code for phones and tablets goes to the console (the service's
+    /// journal) and to koppelcode.txt in the data folder, and again every time it changes (codes are single-use).
+    /// </summary>
+    static void ShowPairingCode()
+    {
+        void Show(string code)
+        {
+            Console.WriteLine("Koppelcode / pairing code: " + code);
+            try { File.WriteAllText(Path.Combine(Log.Dir, "koppelcode.txt"), code + "\n"); } catch { }
+        }
+        Show(Pairing.Code);
+        Pairing.CodeChanged += Show;
     }
 
     /// <summary>show.json; else take over v1.4's settings if they sit next to the exe; else empty.</summary>
@@ -277,9 +317,9 @@ static class KeepAwake
     static extern uint SetThreadExecutionState(uint flags);
     const uint ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x00000001, ES_DISPLAY_REQUIRED = 0x00000002;
 
-    // Called from the main thread, which lives as long as the app.
-    public static void On() => SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
-    public static void Off() => SetThreadExecutionState(ES_CONTINUOUS);
+    // Called from the main thread, which lives as long as the app. Linux: nothing to do (a Pi does not sleep).
+    public static void On() { if (OperatingSystem.IsWindows()) SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED); }
+    public static void Off() { if (OperatingSystem.IsWindows()) SetThreadExecutionState(ES_CONTINUOUS); }
 }
 
 /// <summary>Saves show.json at most once per second after changes.</summary>

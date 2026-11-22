@@ -8,7 +8,7 @@ import { Icon } from "./Icon";
 const order = ["basic", "mood", "party", "theme"];
 
 /** Pick ready-made scenes; they are built for the fixtures in the patch. */
-export function TemplatesDialog({ onClose }: { onClose: () => void }) {
+export function TemplatesDialog({ onClose, selected = [] }: { onClose: () => void; selected?: string[] }) {
   const t = useT();
   const lang = useLang();
   const { full } = useShow();
@@ -17,7 +17,11 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => { api.sceneTemplates().then(setItems).catch(() => {}); }, []);
 
-  const name = (x: SceneTemplateInfo) => (lang === "en" ? x.nameEn : x.name);
+  // lamps chosen on the stage (not all): the examples are spread over those, and named so
+  const some = selected.length > 0 && selected.length < full!.patch.length ? selected : [];
+  // nothing chosen = nothing is added (choose lamps first, or "Alles kiezen" for all of them)
+  const none = selected.length === 0;
+  const name = (x: SceneTemplateInfo) => (lang === "en" ? x.nameEn : x.name) + (some.length ? " " + t("tpl.forN", { n: some.length }) : "");
   const existing = new Set(full!.scenes.map((s) => s.name.toLowerCase()));
   const toggle = (k: string) => setPicked((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const pickAll = (keys: string[]) => setPicked((p) => { const n = new Set(p); const all = keys.every((k) => n.has(k)); keys.forEach((k) => (all ? n.delete(k) : n.add(k))); return n; });
@@ -25,7 +29,7 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
   const add = async () => {
     const keys = [...picked];
     const names = Object.fromEntries(items.filter((x) => picked.has(x.key)).map((x) => [x.key, name(x)]));
-    const r = await api.addSceneTemplates(keys, names);
+    const r = await api.addSceneTemplates(keys, names, some);
     setMsg(t("tpl.added", { n: r.added }) + (r.skipped ? " " + t("tpl.skipped", { n: r.skipped }) : ""));
     setPicked(new Set());
   };
@@ -38,6 +42,7 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
           <button className="btn ghost icon-btn" onClick={onClose}>×</button>
         </div>
         <p className="hint">{t("tpl.hint")}</p>
+        <div className={"note" + (none ? " warn" : "")}><Icon name={none ? "warn" : "info"} />{none ? t("tpl.pickFirst") : some.length ? t("tpl.forSelection", { n: some.length }) : t("tpl.forAll", { n: full!.patch.length })}</div>
         {full!.patch.length === 0 && <div className="note warn"><Icon name="warn" />{t("tpl.noFixtures")}</div>}
         {order.map((cat) => {
           const list = items.filter((x) => x.category === cat);
@@ -66,7 +71,7 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
         {msg && <div className="note"><Icon name="info" />{msg}</div>}
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button className="btn ghost" onClick={onClose}>{t("scenes.done")}</button>
-          <button className="btn primary" disabled={!picked.size || full!.patch.length === 0} onClick={add}>
+          <button className="btn primary" disabled={!picked.size || full!.patch.length === 0 || none} onClick={add}>
             <Icon name="plus" /> {t("tpl.add", { n: picked.size })}
           </button>
         </div>

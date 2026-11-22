@@ -6,7 +6,13 @@ namespace DmxLicht.Core;
 /// </summary>
 public static class Log
 {
-    public static readonly string Dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Instellingen");
+    /// <summary>
+    /// "Instellingen" next to the exe; DMXLICHT_DATA moves it elsewhere (the Linux service uses
+    /// /var/lib/dmx-light-control, so the program folder can stay read-only and be replaced on an update).
+    /// </summary>
+    public static readonly string Dir =
+        Environment.GetEnvironmentVariable("DMXLICHT_DATA") is { Length: > 0 } d ? Path.GetFullPath(d)
+        : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Instellingen");
     public static readonly string FilePath = Path.Combine(Dir, "dmx-log.txt");
     public static readonly string OldFilePath = Path.Combine(Dir, "dmx-log.1.txt");
     public static readonly string CrashDir = Path.Combine(Dir, "Crashes");

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type CompanionStatus } from "../api";
 import { useT } from "../i18n";
 import { Icon } from "./Icon";
+import { onLinux } from "../store";
 
 /** Install the bundled Bitfocus Companion module with one click. */
 export function CompanionCard() {
@@ -39,13 +40,14 @@ export function CompanionCard() {
           <b>{st.sourceFound ? st.sourceVersion : t("cm.missing")}</b>
         </div>
       )}
+      {onLinux() ? <div className="note"><Icon name="info" />{t("linux.companion")}</div> : <>
       {st && !st.companionFound && <div className="note"><Icon name="info" />{t("cm.installCompanion")}</div>}
       <div className="row">
         <button className="btn primary" disabled={busy || !st?.sourceFound} onClick={install}>
           <Icon name="upload" /> {busy ? t("cm.installing") : st?.installedVersion ? (st.upToDate ? t("cm.reinstall") : t("cm.update")) : t("cm.install")}
         </button>
         <button className="btn ghost" onClick={refresh}><Icon name="refresh" /></button>
-      </div>
+      </div></>}
       {msg && <div className={"note" + (msg.ok ? "" : " warn")}><Icon name={msg.ok ? "info" : "warn"} />{msg.text}</div>}
       {st?.installedVersion && <p className="hint">{t("cm.noActions")}</p>}
       {st && <p className="hint mono" style={{ fontSize: 11 }}>{st.modulesDir}</p>}

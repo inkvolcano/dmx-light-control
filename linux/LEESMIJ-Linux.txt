@@ -1,0 +1,79 @@
+DMX Light Control op een Raspberry Pi (Raspberry Pi OS 64-bit)
+==============================================================
+De Pi heeft geen eigen venster nodig: DMX Light Control draait als achtergronddienst en je bedient
+alles via de webpagina, op je telefoon, tablet, pc of in een browser op de Pi zelf.
+
+NODIG
+- Raspberry Pi 3, 4 of 5 met Raspberry Pi OS 64-bit (Bookworm of nieuwer; Lite is genoeg).
+  Een 32-bit Raspberry Pi OS werkt niet.
+- Netwerk (wifi of kabel), en voor de uDMX-dongle een vrije USB-poort.
+
+INSTALLEREN (ook voor een nieuwe versie)
+1. Kopieer DMX-Light-Control-<versie>-linux-arm64.tar.gz naar de Pi (bijv. met scp of een USB-stick).
+2. Op de Pi:
+     tar xzf DMX-Light-Control-<versie>-linux-arm64.tar.gz
+     cd DMX-Light-Control-<versie>-linux-arm64
+     sudo bash install.sh
+   Het script installeert wat ontbreekt (libusb, alsa-utils, ICU), maakt de gebruiker "dmxlicht",
+   zet de udev-regel voor de dongle en start de dienst. Bij een nieuwe versie blijft je show staan.
+3. Het script toont het adres en de koppelcode, bijvoorbeeld:
+     http://192.168.1.20:5150    of    http://<naam-van-de-pi>.local:5150
+
+SHOW VAN WINDOWS MEENEMEN
+- Zet bij de EERSTE installatie de map "Instellingen" van je Windows-pc naast install.sh
+  (in de uitgepakte map). Het script neemt hem dan over. Later: in de app via Instellingen > Shows
+  een show exporteren op Windows en importeren op de Pi.
+
+DE WEBPAGINA OPENEN EN KOPPELEN
+- Open http://<ip-van-de-pi>:5150 op een apparaat in hetzelfde netwerk.
+- Een nieuw apparaat vraagt om de koppelcode (6 cijfers). Die staat:
+     sudo cat /var/lib/dmx-light-control/koppelcode.txt
+     journalctl -u dmx-light-control | grep -i koppelcode
+  Elke code werkt een keer; daarna staat er vanzelf een nieuwe in het bestand.
+- Een browser op de Pi zelf (http://localhost:5150) hoeft niet te koppelen.
+- De vaste naam (Instellingen > Telefoon of tablet) werkt ook: http://dmxlicht.local:5150.
+  De Pi is daarnaast altijd bereikbaar als http://<naam-van-de-pi>.local:5150.
+
+DE DIENST
+- Status:      systemctl status dmx-light-control
+- Logboek:     journalctl -u dmx-light-control -f
+               (het logboek van de app zelf: /var/lib/dmx-light-control/dmx-log.txt)
+- Herstarten:  sudo systemctl restart dmx-light-control
+- Stoppen:     sudo systemctl stop dmx-light-control   (niet meer bij het opstarten: sudo systemctl disable ...)
+- Verwijderen: sudo bash /opt/dmx-light-control/install.sh --uninstall   (show blijft staan)
+               sudo bash /opt/dmx-light-control/install.sh --purge       (alles weg)
+- Programma:   /opt/dmx-light-control      Show, instellingen, liedjes, log: /var/lib/dmx-light-control
+
+USB-DONGLE (uDMX)
+- Geen driver nodig: de app gebruikt libusb. De udev-regel /etc/udev/rules.d/60-udmx.rules geeft de
+  groep plugdev toegang en zet het USB-stroombeheer van de dongle uit. Na het installeren de dongle
+  een keer uit- en insteken als hij er al in zat.
+- "geen toegang" in de app: de udev-regel ontbreekt of de gebruiker zit niet in plugdev
+  (sudo bash install.sh opnieuw draaien lost beide op).
+- Draai maar EEN programma tegelijk met de dongle (dus niet ook QLC+ of OLA met de uDMX).
+- Art-Net en sACN werken net als op Windows (Instellingen > Uitgangen).
+
+GELUID EN MIDI
+- Muziek / beat: een USB-microfoon of USB-geluidskaart met line-in. De app luistert via arecord.
+  Kies het apparaat in Muziek; "standaard" neemt het eerste invoerapparaat.
+  Meeluisteren met wat de Pi zelf afspeelt ("loopback") kan niet.
+- MIDI: een USB-MIDI-controller verschijnt vanzelf in Koppelingen > MIDI.
+
+WAT (NOG) NIET WERKT OP LINUX
+- Scherm volgen en de webcam (Effecten > Scherm volgen).
+- Een liedje afspelen bij een tijdlijn (de tijdlijn loopt wel, zonder geluid; liedjes uploaden kan niet).
+- Automatisch bijwerken: installeer een nieuwe versie met install.sh (zie boven).
+- De Companion-module installeren vanuit de app: Companion op een andere computer verbindt gewoon
+  via het netwerk met de Pi (adres van de Pi, poort 5150).
+- Windows-zaken: firewall-knop, USB-stroombesparing (doet de udev-regel), het venster en de tray.
+
+FIREWALL
+- Raspberry Pi OS heeft standaard geen firewall. Gebruik je ufw, open dan de poorten:
+     sudo ufw allow 5150/tcp     (webpagina)
+     sudo ufw allow 8000/udp     (OSC, als je dat gebruikt)
+     sudo ufw allow 5353/udp     (vaste naam .local)
+
+ZELF STARTEN ZONDER DIENST (voor testen)
+     sudo systemctl stop dmx-light-control
+     DMXLICHT_DATA=$HOME/dmx-test /opt/dmx-light-control/DmxLicht --network
+  Ctrl+C stopt. Zonder DMXLICHT_DATA schrijft de app in de map Instellingen naast het programma.

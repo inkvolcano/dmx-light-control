@@ -69,7 +69,8 @@ static class ProblemReport
         string path = Path.Combine(dir, name);
         try { await File.WriteAllBytesAsync(path, data); }
         catch { path = Path.Combine(Log.Dir, name); await File.WriteAllBytesAsync(path, data); }
-        try { Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + path + "\"") { UseShellExecute = true }); } catch { }
+        if (OperatingSystem.IsWindows())
+            try { Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + path + "\"") { UseShellExecute = true }); } catch { }
         return path;
     }
 
@@ -114,6 +115,9 @@ static class ProblemReport
 
     static string Battery()
     {
+#if !WINDOWS
+        return "-";
+#else
         try
         {
             PowerStatus p = SystemInformation.PowerStatus;
@@ -121,11 +125,13 @@ static class ProblemReport
                 : (p.PowerLineStatus == PowerLineStatus.Online ? "aan de lader" : "OP ACCU") + ", " + (int)(p.BatteryLifePercent * 100) + "%";
         }
         catch { return "?"; }
+#endif
     }
 
     /// <summary>What Windows knows about the dongle; plain PowerShell queries, nothing is changed.</summary>
     static async Task<string> UsbInfoAsync()
     {
+        if (!OperatingSystem.IsWindows()) return LinuxUsbInfo();
         const string ps = """
             $ErrorActionPreference = 'SilentlyContinue'
             "== uDMX-apparaten (VID_16C0 PID_05DC) =="
@@ -176,6 +182,35 @@ static class ProblemReport
             return await output;
         }
         catch (Exception ex) { return "USB-gegevens niet op te vragen: " + ex.Message; }
+    }
+
+    /// <summary>Linux: the dongle as the kernel sees it (sysfs), its USB power setting and the udev rule.</summary>
+    static string LinuxUsbInfo()
+    {
+        var b = new StringBuilder();
+        b.AppendLine("== uDMX-apparaten (16c0:05dc, /sys/bus/usb/devices) ==");
+        List<string> ids = UdmxDevices.InstanceIds();
+        if (ids.Count == 0) b.AppendLine("(geen gevonden - niet ingestoken, of andere VID/PID)");
+        foreach (string id in ids)
+        {
+            string dir = Path.Combine("/sys/bus/usb/devices", id);
+            string Read(string f) { try { return File.ReadAllText(Path.Combine(dir, f)).Trim(); } catch { return "?"; } }
+            b.AppendLine($"{id}: {Read("manufacturer")} {Read("product")}  bus {Read("busnum")} apparaat {Read("devnum")}  snelheid {Read("speed")} Mbit/s");
+            b.AppendLine($"  stroombeheer: power/control={Read("power/control")} (on = altijd aan)");
+            string node = $"/dev/bus/usb/{Read("busnum").PadLeft(3, '0')}/{Read("devnum").PadLeft(3, '0')}";
+            try
+            {
+                var mode = File.GetUnixFileMode(node);
+                b.AppendLine($"  {node}: rechten {mode}");
+            }
+            catch (Exception ex) { b.AppendLine($"  {node}: {ex.Message}"); }
+        }
+        b.AppendLine();
+        b.AppendLine("== udev-regel ==");
+        string rule = "/etc/udev/rules.d/60-udmx.rules";
+        b.AppendLine(File.Exists(rule) ? rule + " aanwezig" : rule + " ONTBREEKT (zie LEESMIJ-Linux.txt)");
+        b.AppendLine("Gebruiker: " + Environment.UserName);
+        return b.ToString();
     }
 
     static void Text(ZipArchive zip, string name, string text)

@@ -1,27 +1,52 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The app: engine + local web server (API + UI) + a window that shows the UI (WebView2). -->
+  <!--
+    Two builds from one project:
+    - net9.0-windows: the Windows app (window, tray, WASAPI sound, screen sync, webcam). Bouwen.bat.
+    - net9.0: the Linux build (Raspberry Pi, linux-arm64): headless web server, uDMX via libusb,
+      sound via arecord, MIDI via ALSA. Bouwen-Linux.bat. Windows-only code sits under #if WINDOWS
+      or in files that only the Windows build compiles; their Linux counterparts live in Linux\.
+  -->
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <TargetFrameworks>net9.0-windows;net9.0</TargetFrameworks>
     <RootNamespace>DmxLicht.App</RootNamespace>
     <AssemblyName>DmxLicht</AssemblyName>
-    <ApplicationIcon>DmxLicht.ico</ApplicationIcon>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <!-- WebView2 also ships a WPF dll that references WindowsBase; harmless for this WinForms app. -->
     <NoWarn>$(NoWarn);MSB3277</NoWarn>
     <!-- no package .xml docs next to the exe -->
     <AllowedReferenceRelatedFileExtensions>.pdb</AllowedReferenceRelatedFileExtensions>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0-windows'">
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>DmxLicht.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <OutputType>Exe</OutputType>
+    <!-- the Linux build only runs on Linux; Windows-only code there is guarded at run time -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0-windows'">
     <PackageReference Include="FlashCap" Version="1.10.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
-    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="NAudio.Midi" Version="2.2.1" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <Compile Remove="Linux\**" />
+  </ItemGroup>
+
+  <!-- Linux: these files are Windows-only; Linux\ has a counterpart with the same class and members -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <Compile Remove="MainWindow.cs;ScreenSampler.cs;CameraCapture.cs;AudioInput.cs;SongClock.cs" />
   </ItemGroup>
 
   <ItemGroup>

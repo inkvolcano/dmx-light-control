@@ -83,7 +83,8 @@ public sealed class UdmxOutput : IDmxOutput
     readonly Queue<long> recentFrames = new();
     readonly Stopwatch clock = Stopwatch.StartNew();
 
-    public UdmxOutput() : this(() => new AutoUdmxTransport(), null) { }
+    /// <summary>Windows: WinUSB / libusbK. Linux: libusb-1.0.</summary>
+    public UdmxOutput() : this(() => OperatingSystem.IsWindows() ? new AutoUdmxTransport() : new LibusbTransport(), null) { }
 
     public UdmxOutput(Func<IUdmxTransport> factory, UdmxOptions options = null)
     {

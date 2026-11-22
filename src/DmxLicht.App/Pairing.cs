@@ -18,7 +18,14 @@ static class Pairing
     static readonly ConcurrentDictionary<string, (int Count, DateTime Since)> attempts = new();
 
     public static string Code => code;
-    public static string NewCode() => code = NewCodeValue();
+    /// <summary>Raised with the new code (the Linux build shows it in the journal and in koppelcode.txt).</summary>
+    public static event Action<string> CodeChanged;
+    public static string NewCode()
+    {
+        code = NewCodeValue();
+        CodeChanged?.Invoke(code);
+        return code;
+    }
     static string NewCodeValue() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 
     static string Hash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));

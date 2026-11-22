@@ -40,6 +40,7 @@ static class AppHealth
     /// <summary>What Windows recorded in the last days: the dongle leaving the USB bus, sleep and wake, app crashes.</summary>
     public static string WindowsEvents()
     {
+        if (!OperatingSystem.IsWindows()) return LinuxEvents();
         var b = new StringBuilder();
         b.AppendLine("Windows-gebeurtenissen (laatste 3 dagen, nieuwste eerst, tijden in pc-tijd):");
         const string days = "259200000";
@@ -53,6 +54,27 @@ static class AppHealth
         Section(b, "App vastgelopen of gecrasht",
             "Application", $"*[System[(EventID=1000 or EventID=1002 or EventID=1026) and TimeCreated[timediff(@SystemTime) <= {days}]]]",
             e => e.Contains("DmxLicht", StringComparison.OrdinalIgnoreCase), 300);
+        return b.ToString();
+    }
+
+    /// <summary>Linux: what the kernel said about USB and the dongle (needs the journal; the service user is in group adm).</summary>
+    static string LinuxEvents()
+    {
+        var b = new StringBuilder();
+        b.AppendLine("Linux-gebeurtenissen (kernel, laatste 3 dagen, USB en uDMX):");
+        try
+        {
+            var psi = new ProcessStartInfo("journalctl", "-k --no-pager -o short-iso --since -3d --grep \"usb|16c0|udmx\" -n 60")
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
+            };
+            using Process p = Process.Start(psi)!;
+            Task<string> read = p.StandardOutput.ReadToEndAsync();
+            if (!p.WaitForExit(15000)) { try { p.Kill(); } catch { } b.AppendLine("  (journalctl reageert niet)"); return b.ToString(); }
+            string text = read.Result.Trim();
+            b.AppendLine(text.Length == 0 ? "  (niets, of geen leesrechten op het journal)" : "  " + text.Replace("\n", "\n  "));
+        }
+        catch (Exception ex) { b.AppendLine("  (niet te lezen: " + ex.Message + ")"); }
         return b.ToString();
     }
 

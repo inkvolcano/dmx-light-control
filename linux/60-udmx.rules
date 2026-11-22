@@ -1,0 +1,4 @@
+# DMX Light Control: uDMX dongle (Anyma, VID 16c0 / PID 05dc)
+# - group plugdev may use it (the service user dmxlicht is in plugdev), so the app needs no root
+# - USB power management off for the dongle ("always on"), like switching off USB power saving on Windows
+SUBSYSTEM=="usb", ATTR{idVendor}=="16c0", ATTR{idProduct}=="05dc", MODE="0660", GROUP="plugdev", TAG+="uaccess", ATTR{power/control}="on"

@@ -3,7 +3,7 @@ using System.Text;
 
 namespace DmxLicht.Core.Output;
 
-/// <summary>Finds uDMX dongles that Windows currently sees (whatever driver they have).</summary>
+/// <summary>Finds uDMX dongles that Windows (or Linux) currently sees (whatever driver they have).</summary>
 public static class UdmxDevices
 {
     const string VidPid = "VID_16C0&PID_05DC";
@@ -24,6 +24,7 @@ public static class UdmxDevices
     /// <summary>Device instance ids like USB\VID_16C0&amp;PID_05DC\5&amp;1234... of plugged-in uDMX dongles.</summary>
     public static List<string> InstanceIds()
     {
+        if (!OperatingSystem.IsWindows()) return SysfsIds();
         var ids = new List<string>();
         IntPtr set = SetupDiGetClassDevsW(IntPtr.Zero, "USB", IntPtr.Zero, 0x06); // ALLCLASSES | PRESENT
         if (set == INVALID) return ids;
@@ -40,6 +41,25 @@ public static class UdmxDevices
             }
         }
         finally { SetupDiDestroyDeviceInfoList(set); }
+        return ids;
+    }
+
+    /// <summary>Linux: USB devices in /sys/bus/usb/devices with the uDMX's vendor and product id (e.g. "1-1.3").</summary>
+    static List<string> SysfsIds()
+    {
+        var ids = new List<string>();
+        try
+        {
+            foreach (string d in Directory.GetDirectories("/sys/bus/usb/devices"))
+            {
+                string vid = Path.Combine(d, "idVendor"), pid = Path.Combine(d, "idProduct");
+                if (File.Exists(vid) && File.Exists(pid)
+                    && File.ReadAllText(vid).Trim().Equals("16c0", StringComparison.OrdinalIgnoreCase)
+                    && File.ReadAllText(pid).Trim().Equals("05dc", StringComparison.OrdinalIgnoreCase))
+                    ids.Add(Path.GetFileName(d));
+            }
+        }
+        catch { }
         return ids;
     }
 }

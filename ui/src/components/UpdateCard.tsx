@@ -3,6 +3,7 @@ import { api, type AppSettings } from "../api";
 import { useT } from "../i18n";
 import { Help } from "./Help";
 import { Icon } from "./Icon";
+import { onLinux } from "../store";
 
 export interface UpdateInfo {
   current: string; latest: string | null; available: boolean; notes: string | null; url: string | null; published: string | null;
@@ -40,7 +41,9 @@ export function UpdateCard({ settings, save }: { settings: AppSettings; save: (c
             {info.notes && <pre className="upd-notes">{info.notes}</pre>}
             {info.state === "downloading" && <div className="upd-bar"><span style={{ width: info.progress + "%" }} /></div>}
             {info.state === "installing" && <span>{t("upd.installing")}</span>}
-            {local
+            {onLinux()
+              ? <span className="hint">{t("linux.update")}</span>
+              : local
               ? <button className="btn primary" style={{ alignSelf: "flex-start" }} disabled={info.state === "downloading" || info.state === "installing"} onClick={install}>
                   <Icon name="refresh" /> {t("upd.install")}</button>
               : <span className="hint">{t("upd.onlyHere")}</span>}

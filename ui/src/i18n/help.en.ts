@@ -162,7 +162,7 @@ Control the light from other devices and programs.
 - When the app is locked it says "Unlock": enter the PIN.
 - On a phone: add the page to your home screen for an app icon (see Settings > Phone or tablet).`,
 
-  "fxcat.own": "Own chases",
+  "fxcat.own": "Own and screen",
   "fx.panelHelp": "This panel belongs to the chosen effect. Grey settings are not used by this effect. Changes show on the fixtures right away while the effect runs.",
 
   "ch.intro": "Make your own chases and patterns: each row is a step, each column a fixture. Click a chase's pencil to edit it.",
@@ -245,7 +245,7 @@ Control the light from other devices and programs.
   "ch.columnsHelp": "The number of fixtures in the pattern. Set it to your number of fixtures for full control, or smaller for a repeating pattern.",
   "ch.asLamps": "= {n} fixtures",
   "ch.sync": "To the beat of the music",
-  "ch.syncHelp": "The chase steps on the beat instead of by time. Works with TAP (tap tempo) or listening on the Music page.",
+  "ch.syncHelp": "The chase steps on the beat instead of by time. Works with TAP (tap tempo) or listening (on the right, under Sound).",
   "ch.beatsPerStep": "Beats per step",
   "ch.syncNoBeat": "No tempo yet: tap the tempo or turn on listening on Music. The preview uses 120 BPM for now.",
   "ch.stepTime": "Step time",
@@ -276,7 +276,7 @@ Control the light from other devices and programs.
   "ch.background": "Background colour",
   "ch.backgroundHelp": "Empty cells get this colour instead of off. For example: a blue background with a white chase.",
   "ch.audio": "Brightness follows the sound",
-  "ch.audioHelp": "The louder the music, the brighter. Works when listening is on on the Music page.",
+  "ch.audioHelp": "The louder the music, the brighter. Works when listening is on (on the right, under Sound).",
   "ch.runOn": "On",
   "ch.runNow": "On the fixtures",
   "ch.update": "Update on the fixtures",
@@ -641,7 +641,7 @@ Let the light do things by itself at set moments.
   "upd.chip": "Update {v}",
   "upd.chipHint": "A new version is out: click to go to Settings",
   "nav.screen": "Screen",
-  "ss.openPage": "Set up on the Screen page",
+  "ss.openPage": "Set up with the gear at Screen and video (on the right)",
   "ss.start": "Start following the screen",
   "ss.lampsNow": "What the lamps do now",
   "ss.isOn": "following the screen",

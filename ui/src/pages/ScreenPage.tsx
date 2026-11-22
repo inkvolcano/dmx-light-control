@@ -22,7 +22,8 @@ export function ScreenPage() {
   return (
     <div className="screen-page">
       <div className="page-head">
-        <h1>{t("nav.screen")}</h1>
+        <button className="btn sm ghost" onClick={() => window.dispatchEvent(new Event("dmx-back"))}><Icon name="chevron-left" size={16} /> {t("rail.back")}</button>
+        <h1>{t("ss.setupTitle")}</h1>
         <Help k="ss.pageHelp" />
         <div className="grow" />
         {running

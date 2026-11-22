@@ -83,7 +83,7 @@ Hier zet je lampen aan en uit en kies je kleuren.
 Kies een effect: het loopt meteen. Klik nog eens om te stoppen.
 1. Kies boven "Voor" alle lampen of één groep: zo kan bijvoorbeeld achter een regenboog lopen en voor vast wit.
 2. Rechts stel je kleuren en snelheid in. Grijze instellingen gebruikt dit effect niet.
-3. Effecten met ♪ reageren op muziek: zet dan bij Muziek het luisteren aan of tik het tempo.
+3. Effecten met ♪ reageren op muziek: zet dan rechts bij Geluid het luisteren aan of tik het tempo.
 # Eigen chases
 - Kies "Eigen chases" en "Nieuwe chase" om zelf een looplicht of patroon te maken.
 - Je eigen chases staan daarna tussen de effecten, ook op de tijdlijn, in scenes en in Companion.
@@ -162,16 +162,16 @@ Het licht bedienen vanaf andere apparaten en programma's.
 - Is de app vergrendeld, dan staat er "Ontgrendelen": vul de PIN in.
 - Op de telefoon: zet de pagina op je beginscherm voor een eigen app-icoon (zie Instellingen > Telefoon of tablet).`,
 
-  "fxcat.own": "Eigen chases",
+  "fxcat.own": "Eigen en scherm",
   "fx.panelHelp": "Dit paneel hoort bij het gekozen effect. Grijze instellingen gebruikt dit effect niet. Wijzigingen zie je meteen op de lampen als het effect loopt.",
 
   // ---------------------------------------------------------------- chase-editor
-  "ch.intro": "Maak je eigen looplichten en patronen: elke rij is een stap, elke kolom een lamp. Klik op het potloodje van een chase om hem te bewerken.",
-  "ch.new": "Nieuwe chase",
+  "ch.intro": "Maak je eigen looplichten en patronen: elke rij is een stap, elke kolom een lamp. Klik op het potloodje van een patroon om het te bewerken.",
+  "ch.new": "Nieuw patroon",
   "ch.newHint": "Zelf een patroon maken",
-  "ch.newName": "Mijn chase {n}",
+  "ch.newName": "Mijn patroon {n}",
   "ch.edit": "Bewerken",
-  "ch.panelHint": "Dit is een eigen chase. Kleuren, stappen en snelheid stel je in de editor in.",
+  "ch.panelHint": "Dit is een eigen patroon. Kleuren, stappen en snelheid stel je in de editor in.",
   "ch.name": "Naam",
   "ch.notSaved": "niet opgeslagen",
   "ch.saved": "opgeslagen",
@@ -179,7 +179,7 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "ch.redo": "Opnieuw (Ctrl+Y)",
   "ch.close": "Sluiten (Esc)",
   "ch.unsaved": "Je wijzigingen zijn niet opgeslagen. Toch sluiten?",
-  "ch.confirmDelete": "Chase \"{name}\" verwijderen? Waar hij gebruikt wordt (scenes, tijdlijn) stopt hij.",
+  "ch.confirmDelete": "Patroon \"{name}\" verwijderen? Waar het gebruikt wordt (scènes, tijdlijn) stopt het.",
   "ch.copySuffix": "(kopie)",
   "ch.duplicated": "Kopie gemaakt - je bewerkt nu de kopie.",
   "ch.running": "Loopt op de lampen. Wijzigingen zie je nu meteen.",
@@ -189,7 +189,7 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "ch.help.3": "Heb je meer lampen dan kolommen, dan herhaalt het patroon zich (of kies bij Verdeling: uitrekken of spiegelen).",
   "ch.help.4": "Bovenaan zie je een voorbeeld, zonder dat de lampen meedoen. De stap die nu speelt licht op in het raster.",
   "ch.help.5": "Begin snel met een voorbeeld onder 'Beginnen met', en pas het daarna aan.",
-  "ch.help.6": "Klaar? 'Op de lampen' slaat op en start de chase. Daarna staat hij bij Effecten > Eigen chases, en is hij te gebruiken in scenes, op de tijdlijn en in Companion.",
+  "ch.help.6": "Klaar? 'Op de lampen' slaat op en start het patroon. Daarna staat het bij Effecten > Eigen en scherm, en is het te gebruiken in scènes, op de tijdlijn en in Companion.",
   "ch.play": "Voorbeeld afspelen",
   "ch.pause": "Voorbeeld pauzeren",
   "ch.previewHint": "Voorbeeld (de lampen doen niet mee)",
@@ -246,13 +246,13 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "ch.columnsHelp": "Het aantal lampen in het patroon. Zet dit gelijk aan je aantal lampen voor volledige controle, of kleiner voor een patroon dat zich herhaalt.",
   "ch.asLamps": "= {n} lampen",
   "ch.sync": "Op de maat van de muziek",
-  "ch.syncHelp": "De chase stapt mee op de tel in plaats van op tijd. Werkt met TAP (tempo tikken) of luisteren op de pagina Muziek.",
+  "ch.syncHelp": "Het patroon stapt mee op de tel in plaats van op tijd. Werkt met TAP (tempo tikken) of luisteren (rechts, bij Geluid).",
   "ch.beatsPerStep": "Tellen per stap",
-  "ch.syncNoBeat": "Er is nog geen tempo: tik het tempo of zet luisteren aan bij Muziek. Het voorbeeld gebruikt nu 120 BPM.",
+  "ch.syncNoBeat": "Er is nog geen tempo: tik het tempo of zet luisteren aan (rechts, bij Geluid). Het voorbeeld gebruikt nu 120 BPM.",
   "ch.stepTime": "Staptijd",
   "ch.stepTimeHelp": "Hoe lang elke stap duurt. Per stap kun je dit in de kolom 'Tijd' nog aanpassen.",
   "ch.speed": "Snelheid",
-  "ch.speedHelp": "Maakt de hele chase sneller of langzamer zonder de stappen te veranderen (100% = zoals ontworpen).",
+  "ch.speedHelp": "Maakt het hele patroon sneller of langzamer zonder de stappen te veranderen (100% = zoals ontworpen).",
   "ch.fadeAll": "Overvloeien",
   "ch.fadeHelp": "0% = harde stappen. Hoger = elke stap vloeit aan het eind zacht over in de volgende. 100% = continu vloeiend.",
   "ch.direction": "Richting",
@@ -277,11 +277,11 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "ch.background": "Achtergrondkleur",
   "ch.backgroundHelp": "Lege vakjes krijgen deze kleur in plaats van uit. Bijvoorbeeld: blauwe achtergrond met een wit looplicht.",
   "ch.audio": "Helderheid op het geluid",
-  "ch.audioHelp": "Hoe harder de muziek, hoe feller. Werkt als luisteren aan staat op de pagina Muziek.",
+  "ch.audioHelp": "Hoe harder de muziek, hoe feller. Werkt als luisteren aan staat (rechts, bij Geluid).",
   "ch.runOn": "Op",
   "ch.runNow": "Op de lampen",
   "ch.update": "Bijwerken op de lampen",
-  "ch.liveHint": "Deze chase loopt: elke wijziging staat na een moment op de lampen.",
+  "ch.liveHint": "Dit patroon loopt: elke wijziging staat na een moment op de lampen.",
   "ch.save": "Opslaan",
   "ch.savedMsg": "Opgeslagen.",
   "ch.duplicate": "Kopie maken",
@@ -322,7 +322,7 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "easy.settingsHelp": "De eenvoudige bediening heeft grote knoppen voor telefoon en tablet, en is ook wat anderen zien als de app vergrendeld is. Aan/uit, helderheid, blackout en scènes staan er altijd in; hier kies je wat er nog meer bij komt.",
   "easy.settingsHint": "Wat er naast aan/uit, helderheid en scènes nog te zien is:",
   "easy.show.colors": "Kleuren",
-  "easy.show.effects": "Effecten (en eigen chases)",
+  "easy.show.effects": "Effecten (en eigen patronen)",
   "easy.show.groups": "Groepen kiezen",
   "easy.show.music": "Muziek: TAP en BPM",
   "easy.show.timelines": "Tijdlijnen starten en stoppen",
@@ -481,7 +481,7 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "ha.step4": "Vul hierboven het adres van Home Assistant in (bijv. homeassistant.local of 192.168.1.50), poort 1883, en die gebruiker met wachtwoord. Zet 'Verbinden' aan.",
   "ha.step5": "Bij Apparaten & diensten > MQTT staat nu het apparaat 'DMX Light Control' met alle entiteiten.",
   "ha.whatTitle": "Wat je in Home Assistant krijgt",
-  "ha.what1": "Lamp 'Licht': aan/uit, helderheid, kleur en effect (ook je eigen chases en Scherm volgen).",
+  "ha.what1": "Lamp 'Licht': aan/uit, helderheid, kleur en effect (ook je eigen patronen en Scherm volgen).",
   "ha.what2": "Een lamp per groep (aan/uit en kleur).",
   "ha.what3": "Keuzelijsten 'Scène' en 'Effect', schuif 'Helderheid', schakelaars 'Blackout' en 'Strobo'.",
   "ha.what4": "Knoppen: effecten stoppen, tijdlijn start/GO, tijdlijn stop, tap tempo.",
@@ -523,7 +523,7 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "osc.ex.colorHex": "Een groep in een eigen kleur",
   "osc.ex.effect": "Effect Vuur op alle lampen",
   "osc.ex.effectGroup": "Effect op één groep",
-  "osc.ex.chase": "Je eigen chase",
+  "osc.ex.chase": "Je eigen patroon",
   "osc.ex.screen": "Scherm volgen",
   "osc.ex.stop": "Effecten stoppen",
   "osc.ex.strobe": "Strobo aan (1) / uit (0): ideaal voor een knop die je ingedrukt houdt",
@@ -545,7 +545,7 @@ Het licht bedienen vanaf andere apparaten en programma's.
   "osc.app3": "Bitfocus Companion: gebruik liever de DMX Light Control-module (Koppelingen > Stream Deck); met de generieke OSC-module kan het ook.",
   "osc.app4": "Resolume / Open Stage Control / Max: stuur naar dezelfde host en poort; de adressen zijn hetzelfde.",
   "osc.names": "Alle effectnamen en kleuren",
-  "osc.namesHint": "Gebruik deze namen achter /dmxlicht/effect/ (houd de muis erop voor de Nederlandse naam). Je eigen chases gaan op hun naam.",
+  "osc.namesHint": "Gebruik deze namen achter /dmxlicht/effect/ (houd de muis erop voor de Nederlandse naam). Je eigen patronen gaan op hun naam.",
   "osc.colorNames": "Kleuren (ook Nederlandse namen en #RRGGBB werken)",
 
   "help.page.schedule": `# Tijdschema
@@ -651,7 +651,7 @@ Laat het licht vanzelf iets doen op vaste momenten.
   "upd.chip": "Update {v}",
   "upd.chipHint": "Er is een nieuwe versie: klik om naar Instellingen te gaan",
   "nav.screen": "Scherm",
-  "ss.openPage": "Instellen op de pagina Scherm",
+  "ss.openPage": "Instellen via het tandwiel bij Scherm en video (rechts)",
   "ss.start": "Scherm volgen starten",
   "ss.lampsNow": "Wat de lampen nu doen",
   "ss.isOn": "volgt het scherm",

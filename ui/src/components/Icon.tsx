@@ -37,6 +37,8 @@ const paths: Record<string, string> = {
   upload: "M12 16V4M7 9l5-5 5 5M4 20h16",
   undo: "M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3",
   redo: "M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h3",
+  "chevron-left": "M15 6l-6 6 6 6",
+  "chevron-right": "M9 6l6 6-6 6",
   numbers: "M4 7h2v10M4 17h4M11 9a2 2 0 1 1 4 0c0 2-4 3-4 6h4M18 7h2a1.5 1.5 0 0 1 0 5h-1 1a1.5 1.5 0 0 1 0 5h-2",
 };
 

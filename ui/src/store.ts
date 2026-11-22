@@ -68,6 +68,8 @@ function decode(b64: string | undefined) {
 }
 
 export const useShow = () => useSyncExternalStore(showStore.subscribe, showStore.get);
+/** The Raspberry Pi / Linux build: no screen sync, songs, firewall button, USB power saving or self-update. */
+export const onLinux = () => showStore.get().boot?.platform === "linux";
 export const useLive = () => useSyncExternalStore(liveStore.subscribe, liveStore.get);
 
 // pairing: the pairing screen resolves this when the code was accepted

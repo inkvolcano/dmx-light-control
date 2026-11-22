@@ -62,6 +62,8 @@ public sealed class ShowState
 
     /// <summary>Effects running on single groups, drawn over the rest (in this order).</summary>
     public List<EffectLayer> Layers { get; set; } = new();
+    /// <summary>Lamps that show their own fixed colour while an effect runs (a colour or scene picked for a selection).</summary>
+    public List<string> Held { get; set; } = new();
 
     /// <summary>Fade time for live changes (colours, on/off, effects) in ms; 0 = instant.</summary>
     public int FadeMs { get; set; }
