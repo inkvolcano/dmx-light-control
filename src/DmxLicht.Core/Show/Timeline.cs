@@ -19,16 +19,26 @@ public sealed class TimelineClip
     public double EndMs => StartMs + LengthMs;
 }
 
-/// <summary>A row of clips. Scene tracks hold scenes; effect tracks run effects on their target.</summary>
+/// <summary>
+/// A row of clips. The editor shows one row for all lamps (kind "all") and one row per lamp (kind "lamp",
+/// <see cref="Target"/> = the lamp's id); both hold scenes, effects and colours. Older timelines have
+/// "scenes" rows (scenes for all lamps) and "effects" rows (effects on all lamps or on a group).
+/// </summary>
 public sealed class TimelineTrack
 {
+    public const string All = "all", Lamp = "lamp", Scenes = "scenes", Effects = "effects";
+
     public string Id { get; set; } = PatchedFixture.NewId();
     public string Name { get; set; }
-    /// <summary>"scenes" or "effects".</summary>
-    public string Kind { get; set; } = "effects";
-    /// <summary>Effect tracks: "*" = all fixtures, otherwise a group id.</summary>
+    /// <summary>"all", "lamp", or (older timelines) "scenes" / "effects".</summary>
+    public string Kind { get; set; } = Effects;
+    /// <summary>"lamp" rows: the lamp's id. "effects" rows: "*" = all lamps, otherwise a group id.</summary>
     public string Target { get; set; } = "*";
     public List<TimelineClip> Clips { get; set; } = new();
+
+    public bool IsLamp => Kind == Lamp;
+    /// <summary>Scene clips on this row are scenes for every lamp.</summary>
+    public bool ScenesForAll => Kind == All || Kind == Scenes;
 }
 
 /// <summary>A point on the timeline: "wait" pauses playback until GO, "cue" is just a jump target.</summary>

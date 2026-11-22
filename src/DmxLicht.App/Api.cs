@@ -48,7 +48,8 @@ static class Api
     /// <summary>An effect for the lamps chosen on the stage; no effect = stop it on those lamps.</summary>
     public sealed record SelectionEffectRequest(string[] Ids, EffectSettings Effect);
     public sealed record LayerRequest(string GroupId, EffectSettings Effect);
-    public sealed record SceneRequest(string Id, string Name, string Color, int? FadeMs, bool Capture);
+    /// <summary>Ids: the lamps chosen on the stage when saving (some of them = a scene for those lamps only).</summary>
+    public sealed record SceneRequest(string Id, string Name, string Color, int? FadeMs, bool Capture, string[] Ids = null);
 
     // Endpoints that change the setup; blocked while locked unless the request carries the PIN.
     static readonly string[] Protected =
@@ -667,7 +668,7 @@ static class Api
                     Scene have = s.Scenes.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
                     if (have != null) { skipped++; sceneIds.Add(have.Id); continue; }
                     var sc = new Scene { Name = name, Color = t.Color, FadeMs = t.FadeMs,
-                        State = subset ? Selection.TemplateOn(t.Build(some), s.State, some) : t.Build(ids) };
+                        State = subset ? Selection.TemplateOn(t.Build(some), s.State, some) : t.Build(ids), Lamps = subset ? some : null };
                     s.Scenes.Add(sc);
                     sceneIds.Add(sc.Id);
                     added++;
@@ -686,6 +687,8 @@ static class Api
                 bool isNew = sc == null;
                 if (isNew) { sc = new Scene(); s.Scenes.Add(sc); }
                 if (isNew || r.Capture) sc.State = SceneOps.Capture(s.State);
+                // saved with some lamps chosen: the scene is for those lamps (overwriting without a choice keeps them)
+                if (isNew || (r.Capture && r.Ids != null)) sc.Lamps = SceneOps.LampsFor(r.Ids, s.Patch.Select(p => p.Id).ToList());
                 if (!string.IsNullOrWhiteSpace(r.Name)) sc.Name = r.Name.Trim();
                 sc.Name ??= "Scene " + s.Scenes.Count;
                 if (r.Color != null) sc.Color = r.Color;
@@ -702,10 +705,13 @@ static class Api
             if (sc == null) return Results.NotFound();
             engine.Change(s =>
             {
-                string[] ids = (r.Ids ?? Array.Empty<string>()).Where(id => s.Patch.Any(p => p.Id == id)).Distinct().ToArray();
-                // lamps chosen on the stage (not all of them): the scene for those lamps only
-                if (ids.Length > 0 && ids.Length < s.Patch.Count) Selection.ApplyScene(sc, s.State, ids);
-                else { SceneOps.Apply(sc.State, s.State); s.State.ActiveScene = sc.Id; }
+                List<string> patch = s.Patch.Select(p => p.Id).ToList();
+                string[] chosen = (r.Ids ?? Array.Empty<string>()).Where(patch.Contains).Distinct().ToArray();
+                // the scene's own lamps (all, or the ones it was saved for), and of those the ones chosen on the stage
+                List<string> ids = SceneOps.LampsOf(sc, patch) ?? patch;
+                if (chosen.Length > 0) ids = ids.Intersect(chosen).ToList();
+                if (ids.Count >= patch.Count) { SceneOps.Apply(sc.State, s.State); s.State.ActiveScene = sc.Id; }
+                else if (ids.Count > 0) Selection.ApplyScene(sc, s.State, ids);
             }, fade: sc.FadeMs);
             return Results.Ok();
         });
@@ -1227,7 +1233,7 @@ static class Api
             groups = s.Groups,
             timelines = s.Timelines,
             schedule = s.Schedule,
-            scenes = s.Scenes.Select(x => new { x.Id, x.Name, x.Color, x.FadeMs, mode = x.State.Mode }),
+            scenes = s.Scenes.Select(x => new { x.Id, x.Name, x.Color, x.FadeMs, mode = x.State.Mode, lamps = SceneOps.LampsOf(x, s.Patch.Select(p => p.Id).ToList()) }),
             identify = s.State.Identify.ToArray(),
             settings = PublicSettings(s.Settings),
             rig = new

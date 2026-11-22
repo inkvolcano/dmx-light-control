@@ -44,12 +44,32 @@ public sealed class Scene
     public string Color { get; set; }
     public int FadeMs { get; set; } = 1000;
     public SceneState State { get; set; } = new();
+    /// <summary>
+    /// The lamps the scene is for (saved with only some lamps chosen); null = every lamp. Recalling it changes
+    /// only these lamps, and on the timeline it lands on their rows.
+    /// </summary>
+    public List<string> Lamps { get; set; }
 }
 
 public static class SceneOps
 {
     /// <summary>Deep copy via JSON (state is small; keeps the copy independent of later edits).</summary>
     public static T Clone<T>(T value) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(value, Json.Compact), Json.Compact);
+
+    /// <summary>The lamps of <paramref name="patch"/> the scene is for; null = all of them.</summary>
+    public static List<string> LampsOf(Scene sc, IReadOnlyCollection<string> patch)
+    {
+        if (sc.Lamps == null || sc.Lamps.Count == 0) return null;
+        List<string> l = sc.Lamps.Where(patch.Contains).Distinct().ToList();
+        return l.Count >= patch.Count ? null : l;
+    }
+
+    /// <summary>"Only these lamps" for a scene being saved: null when that is every lamp (or none is given).</summary>
+    public static List<string> LampsFor(IEnumerable<string> ids, IReadOnlyCollection<string> patch)
+    {
+        List<string> l = (ids ?? Array.Empty<string>()).Where(patch.Contains).Distinct().ToList();
+        return l.Count == 0 || l.Count >= patch.Count ? null : l;
+    }
 
     public static SceneState Capture(ShowState s)
     {
@@ -62,8 +82,14 @@ public static class SceneOps
     {
         SceneState c = Clone(scene);
         s.Mode = c.Mode;
-        s.Looks = c.Looks ?? new();
-        s.Faders = c.Faders ?? new();
+        // lamps the scene does not know (added after it was saved, or a scene from another patch) keep their
+        // look: they used to lose it and go dark
+        Dictionary<string, FixtureLook> looks = c.Looks ?? new();
+        foreach (var kv in s.Looks ?? new()) looks.TryAdd(kv.Key, kv.Value);
+        Dictionary<string, byte[]> faders = c.Faders ?? new();
+        foreach (var kv in s.Faders ?? new()) faders.TryAdd(kv.Key, kv.Value);
+        s.Looks = looks;
+        s.Faders = faders;
         s.Effect = c.Effect ?? new();
         s.Layers = c.Layers ?? new();
         s.Held = c.Held ?? new();

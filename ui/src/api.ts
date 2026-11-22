@@ -52,7 +52,8 @@ export interface FixtureGroup { id: string; name: string; fixtureIds: string[] }
 export interface EffectLayer { groupId: string; effect: EffectSettings; source?: string | null; fixtureIds?: string[] | null }
 export type ClipKind = "scene" | "effect";
 export interface TimelineClip { id: string; startMs: number; lengthMs: number; kind: ClipKind; sceneId: string | null; effect: EffectSettings | null; fadeMs: number }
-export interface TimelineTrack { id: string; name: string; kind: "scenes" | "effects"; target: string; clips: TimelineClip[] }
+/** A timeline row: "all" = all lamps, "lamp" = one lamp (target = its id); "scenes"/"effects" = rows of older timelines. */
+export interface TimelineTrack { id: string; name: string; kind: "all" | "lamp" | "scenes" | "effects"; target: string; clips: TimelineClip[] }
 export interface TimelineMarker { id: string; atMs: number; name: string | null; kind: "wait" | "cue" }
 export interface Timeline {
   id: string; name: string; lengthMs: number; bpm: number; snap: boolean; loop: boolean; audioFile: string | null; tracks: TimelineTrack[];
@@ -60,7 +61,8 @@ export interface Timeline {
 }
 export interface TimelineLive { id: string | null; playing: boolean; positionMs: number; waiting?: string | null }
 export interface SceneTemplateInfo { key: string; name: string; nameEn: string; category: string; color: string }
-export interface SceneInfo { id: string; name: string; color: string; fadeMs: number; mode: OutputMode }
+/** lamps: the lamps the scene was saved for; null = every lamp. */
+export interface SceneInfo { id: string; name: string; color: string; fadeMs: number; mode: OutputMode; lamps?: string[] | null }
 export interface FixtureLook { on: boolean; color: ColorRef }
 
 export interface EffectSettings {
@@ -333,7 +335,7 @@ export const api = {
   stopLayer: (groupId: string | null) => call("POST", "layers/stop", { id: groupId }),
   /** An effect on the lamps chosen on the stage only; null = stop it on those lamps. */
   selectionEffect: (ids: string[], effect: EffectSettings | null) => call("POST", "layers/selection", { ids, effect }),
-  saveScene: (s: { id?: string; name?: string; color?: string; fadeMs?: number; capture?: boolean }) =>
+  saveScene: (s: { id?: string; name?: string; color?: string; fadeMs?: number; capture?: boolean; ids?: string[] }) =>
     call<{ id: string }>("POST", "scenes/save", { capture: false, ...s }),
   /** With ids (the lamps chosen on the stage): the scene for those lamps only. */
   recallScene: (id: string, ids?: string[]) => call("POST", "scenes/recall", { id, ids: ids?.length ? ids : undefined }),

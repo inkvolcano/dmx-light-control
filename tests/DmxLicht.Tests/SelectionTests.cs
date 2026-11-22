@@ -141,4 +141,19 @@ public class SelectionTests
         Assert.Equal(new byte[] { 255, 0, 0 }, Lamp(f, 1));
         Assert.Equal(new byte[] { 0, 0, 255 }, Lamp(f, 2));
     }
+
+    [Fact]
+    public void ASceneLeavesLampsItDoesNotKnowAsTheyAre()
+    {
+        // a lamp added after the scene was saved (or a scene from another patch) must not go dark
+        var scene = new SceneState();
+        scene.Looks["a"] = new FixtureLook { On = true, Color = ColorRef.Palette("red") };
+        var s = new ShowState();
+        s.Looks["a"] = new FixtureLook { On = true, Color = ColorRef.Palette("blue") };
+        s.Looks["new"] = new FixtureLook { On = true, Color = ColorRef.Palette("green") };
+        SceneOps.Apply(scene, s);
+        Assert.Equal("red", s.Looks["a"].Color.Key);
+        Assert.True(s.Looks["new"].On);
+        Assert.Equal("green", s.Looks["new"].Color.Key);
+    }
 }

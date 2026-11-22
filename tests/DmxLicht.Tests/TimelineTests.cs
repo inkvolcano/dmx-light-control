@@ -215,4 +215,82 @@ public class TimelineTests
         clock.PositionMs = 4500;
         player.Previous(t); Assert.Equal(1000, clock.PositionMs);   // within 1 s after a point: the one before
     }
+
+    /// <summary>The editor's rows: one for all lamps, one per lamp.</summary>
+    static (ShowFile show, Timeline t, ManualClock clock, TimelinePlayer player) LampRows()
+    {
+        var show = new ShowFile();
+        var red = new Scene { Id = "red", FadeMs = 0 };
+        red.State.Looks["a"] = new FixtureLook { On = true, Color = ColorRef.Palette("red") };
+        red.State.Looks["b"] = new FixtureLook { On = true, Color = ColorRef.Palette("red") };
+        var blue = new Scene { Id = "blue", FadeMs = 0 };
+        blue.State.Looks["a"] = new FixtureLook { On = true, Color = ColorRef.Palette("blue") };
+        blue.State.Looks["b"] = new FixtureLook { On = true, Color = ColorRef.Palette("blue") };
+        show.Scenes.AddRange(new[] { red, blue });
+        var t = new Timeline { LengthMs = 10000 };
+        t.Tracks.Add(new TimelineTrack { Kind = TimelineTrack.All });
+        t.Tracks.Add(new TimelineTrack { Kind = TimelineTrack.Lamp, Target = "b" });
+        show.Timelines.Add(t);
+        var clock = new ManualClock();
+        return (show, t, clock, new TimelinePlayer(_ => clock));
+    }
+
+    [Fact]
+    public void ALampRowsSceneChangesOnlyThatLamp()
+    {
+        var (show, t, clock, player) = LampRows();
+        t.Tracks[0].Clips.Add(new TimelineClip { Kind = ClipKind.Scene, SceneId = "red", StartMs = 0 });
+        t.Tracks[1].Clips.Add(new TimelineClip { Kind = ClipKind.Scene, SceneId = "blue", StartMs = 2000 });
+        player.Play(t);
+        player.Tick(show, _ => { });
+        Assert.Equal("red", show.State.Looks["b"].Color.Key);
+        clock.PositionMs = 2500; player.Tick(show, _ => { });
+        Assert.Equal("red", show.State.Looks["a"].Color.Key);    // the other lamp keeps the scene for all lamps
+        Assert.Equal("blue", show.State.Looks["b"].Color.Key);
+        // a scene for all lamps that comes later wins again
+        t.Tracks[0].Clips.Add(new TimelineClip { Kind = ClipKind.Scene, SceneId = "red", StartMs = 3000 });
+        clock.PositionMs = 3500; player.Tick(show, _ => { });
+        Assert.Equal("red", show.State.Looks["b"].Color.Key);
+        // seeking back to the lamp's scene puts it on again
+        player.Seek(2500); player.Tick(show, _ => { });
+        Assert.Equal("blue", show.State.Looks["b"].Color.Key);
+    }
+
+    [Fact]
+    public void ALampRowsEffectRunsOnThatLampOnTopOfTheAllLampsEffect()
+    {
+        var (show, t, clock, player) = LampRows();
+        t.Tracks[1].Clips.Add(new TimelineClip { Kind = ClipKind.Effect, StartMs = 0, LengthMs = 4000, Effect = new EffectSettings { EffectIndex = 3 } });
+        t.Tracks[0].Clips.Add(new TimelineClip { Kind = ClipKind.Effect, StartMs = 0, LengthMs = 4000, Effect = new EffectSettings { EffectIndex = 26 } });
+        t.Tracks[0].Clips.Add(new TimelineClip { Kind = ClipKind.Effect, StartMs = 1000, LengthMs = 1000, Effect = new EffectSettings { EffectIndex = 5 } });
+        player.Play(t);
+        clock.PositionMs = 1500; player.Tick(show, _ => { });
+        var mine = show.State.Layers.Where(l => l.Source == TimelinePlayer.Source).ToList();
+        Assert.Equal(3, mine.Count);                             // overlapping clips in one row both run
+        Assert.Equal(new[] { 26, 5, 3 }, mine.Select(l => l.Effect.EffectIndex));   // the lamp's own effect paints last
+        Assert.Equal("*", mine[0].GroupId);
+        Assert.Null(mine[0].FixtureIds);
+        Assert.Equal(new[] { "b" }, mine[2].FixtureIds);
+        clock.PositionMs = 4500; player.Tick(show, _ => { });
+        Assert.DoesNotContain(show.State.Layers, l => l.Source == TimelinePlayer.Source);
+    }
+
+    [Fact]
+    public void AScenesSavedForSomeLampsChangesOnlyThose()
+    {
+        var (show, t, clock, player) = LampRows();
+        show.Patch.Add(new PatchedFixture { Id = "a" });
+        show.Patch.Add(new PatchedFixture { Id = "b" });
+        show.Scenes.First(x => x.Id == "blue").Lamps = new() { "b" };
+        Assert.Equal(new[] { "b" }, SceneOps.LampsOf(show.Scenes.First(x => x.Id == "blue"), new[] { "a", "b" }));
+        Assert.Null(SceneOps.LampsFor(new[] { "a", "b" }, new[] { "a", "b" }));   // every lamp = no list
+        Assert.Equal(new[] { "a" }, SceneOps.LampsFor(new[] { "a", "x" }, new[] { "a", "b" }));
+        t.Tracks[0].Clips.Add(new TimelineClip { Kind = ClipKind.Scene, SceneId = "red", StartMs = 0 });
+        t.Tracks[0].Clips.Add(new TimelineClip { Kind = ClipKind.Scene, SceneId = "blue", StartMs = 1000 });
+        player.Play(t);
+        player.Tick(show, _ => { });
+        clock.PositionMs = 1500; player.Tick(show, _ => { });
+        Assert.Equal("red", show.State.Looks["a"].Color.Key);
+        Assert.Equal("blue", show.State.Looks["b"].Color.Key);
+    }
 }

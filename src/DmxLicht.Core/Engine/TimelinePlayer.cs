@@ -40,7 +40,8 @@ public sealed class TimelinePlayer
 
     readonly Func<Timeline, ITimelineClock> clockFactory;
     ITimelineClock clock;
-    string appliedScene;          // clip id of the scene last applied
+    string appliedScene;          // clip id of the scene last applied (for all lamps)
+    readonly Dictionary<string, string> appliedLampScene = new();   // lamp row id -> clip id of its scene last applied
     string appliedEffects = "";   // signature of the active effect clips; null = rebuild (also removes old layers)
     bool stopRequested;
     bool wasPlaying;
@@ -112,6 +113,7 @@ public sealed class TimelinePlayer
         clock?.Seek(Math.Max(0, ms));
         lastPosition = Math.Max(0, ms);
         appliedScene = null; // re-evaluate which scene belongs here
+        appliedLampScene.Clear();
         WaitingAt = null;
     }
 
@@ -161,7 +163,7 @@ public sealed class TimelinePlayer
         if (stopRequested)
         {
             stopRequested = false;
-            appliedScene = null; appliedEffects = "";
+            appliedScene = null; appliedEffects = ""; appliedLampScene.Clear();
             int removed = show.State.Layers.RemoveAll(l => l.Source == Source);
             clock?.Dispose(); clock = null; TimelineId = null;
             return removed > 0;
@@ -201,38 +203,65 @@ public sealed class TimelinePlayer
         lastPosition = pos;
         bool changed = false;
 
-        // scene: the last scene clip that has started (on any scene track)
-        TimelineClip sceneClip = t.Tracks.Where(k => k.Kind == "scenes").SelectMany(k => k.Clips)
+        // scene for all lamps: the last scene clip that has started (on any such row)
+        TimelineClip sceneClip = t.Tracks.Where(k => k.ScenesForAll).SelectMany(k => k.Clips)
             .Where(c => c.Kind == ClipKind.Scene && c.StartMs <= pos).OrderBy(c => c.StartMs).LastOrDefault();
         if (sceneClip != null && sceneClip.Id != appliedScene)
         {
             Scene sc = show.Scenes.FirstOrDefault(s => s.Id == sceneClip.SceneId);
             appliedScene = sceneClip.Id;
+            appliedLampScene.Clear();   // it replaced the lamps: the lamp rows' scenes that came later go on again
             if (sc != null)
             {
                 int fade = sceneClip.FadeMs >= 0 ? sceneClip.FadeMs : sc.FadeMs;
                 // jumping into the middle of a clip (seek) should not fade from far away
                 if (pos - sceneClip.StartMs > Math.Max(fade, 200)) fade = 0;
                 if (fade > 0) startFade(fade);
-                List<EffectLayer> mine = show.State.Layers.Where(l => l.Source == Source).ToList();
-                SceneOps.Apply(sc.State, show.State);
-                show.State.Layers.AddRange(mine);
-                show.State.ActiveScene = sc.Id;
+                // a scene saved for some lamps only changes those
+                List<string> lamps = SceneOps.LampsOf(sc, show.Patch.Select(p => p.Id).ToList());
+                if (lamps != null) Selection.ApplyScene(sc, show.State, lamps);
+                else
+                {
+                    List<EffectLayer> mine = show.State.Layers.Where(l => l.Source == Source).ToList();
+                    SceneOps.Apply(sc.State, show.State);
+                    show.State.Layers.AddRange(mine);
+                    show.State.ActiveScene = sc.Id;
+                }
                 changed = true;
             }
         }
 
-        // effects: one layer per active effect clip, in track order
-        var active = t.Tracks.Where(k => k.Kind == "effects")
-            .Select(k => (track: k, clip: k.Clips.FirstOrDefault(c => c.Kind == ClipKind.Effect && c.StartMs <= pos && pos < c.EndMs && c.Effect != null)))
-            .Where(x => x.clip != null).ToList();
+        // a lamp row's scene: the lamp takes its part of the scene (when it started after the scene for all lamps)
+        foreach (TimelineTrack lamp in t.Tracks.Where(k => k.IsLamp && k.Target != null))
+        {
+            TimelineClip c = lamp.Clips.Where(x => x.Kind == ClipKind.Scene && x.StartMs <= pos).OrderBy(x => x.StartMs).LastOrDefault();
+            if (c == null || (sceneClip != null && c.StartMs < sceneClip.StartMs)) continue;
+            if (appliedLampScene.TryGetValue(lamp.Id, out string done) && done == c.Id) continue;
+            appliedLampScene[lamp.Id] = c.Id;
+            Scene sc = show.Scenes.FirstOrDefault(s => s.Id == c.SceneId);
+            if (sc == null) continue;
+            int fade = c.FadeMs >= 0 ? c.FadeMs : sc.FadeMs;
+            if (pos - c.StartMs > Math.Max(fade, 200)) fade = 0;
+            if (fade > 0) startFade(fade);
+            Selection.ApplyScene(sc, show.State, new[] { lamp.Target });
+            changed = true;
+        }
+
+        // effects (and colours): one layer per running effect clip. All lamps first, then groups, then single
+        // lamps on top; within a row the clip that started last is on top.
+        var active = t.Tracks.OrderBy(k => k.IsLamp ? 2 : k.Kind == TimelineTrack.Effects && (k.Target ?? "*") != "*" ? 1 : 0)
+            .SelectMany(k => k.Clips.Where(c => c.Kind == ClipKind.Effect && c.Effect != null && c.StartMs <= pos && pos < c.EndMs)
+                .OrderBy(c => c.StartMs).Select(c => (track: k, clip: c)))
+            .ToList();
         string signature = string.Join("|", active.Select(a => a.track.Id + ":" + a.clip.Id));
         if (signature != appliedEffects)
         {
             appliedEffects = signature;
             show.State.Layers.RemoveAll(l => l.Source == Source);
             foreach (var (track, clip) in active)
-                show.State.Layers.Add(new EffectLayer { GroupId = track.Target ?? "*", Effect = SceneOps.Clone(clip.Effect), Source = Source });
+                show.State.Layers.Add(track.IsLamp
+                    ? new EffectLayer { GroupId = "tl:" + track.Target, FixtureIds = new() { track.Target }, Effect = SceneOps.Clone(clip.Effect), Source = Source }
+                    : new EffectLayer { GroupId = track.Kind == TimelineTrack.Effects ? track.Target ?? "*" : "*", Effect = SceneOps.Clone(clip.Effect), Source = Source });
             changed = true;
         }
         return changed;

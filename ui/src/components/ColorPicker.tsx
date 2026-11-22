@@ -5,13 +5,15 @@ export function ColorInput({ value, onPick, title }: { value: string; onPick: (h
   const ref = useRef<HTMLInputElement>(null);
   const cb = useRef(onPick);
   cb.current = onPick;
+  // the input is made anew for every new value (key={value}), so the listener goes onto each new one:
+  // with [] it stayed on the first input and only the first pick ever arrived
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const h = () => cb.current(el.value.toUpperCase());
     el.addEventListener("change", h);
     return () => el.removeEventListener("change", h);
-  }, []);
+  }, [value]);
   return <input ref={ref} type="color" defaultValue={value.toLowerCase()} key={value} title={title} />;
 }
 

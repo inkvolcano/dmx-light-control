@@ -14,12 +14,44 @@ const fmt = (ms: number) => {
 };
 
 type Drag =
-  | { kind: "move"; clipId: string; trackId: string; startX: number; origStart: number; origTrack: string; moved: boolean }
-  | { kind: "resize-l" | "resize-r"; clipId: string; trackId: string; startX: number; origStart: number; origLen: number }
+  | { kind: "move"; clipId: string; row: string; startX: number; origStart: number; moved: boolean }
+  | { kind: "resize-l" | "resize-r"; clipId: string; startX: number; origStart: number; origLen: number }
   | { kind: "palette"; item: DragItem; x: number; y: number }
   | { kind: "seek" }
   | { kind: "flag"; which: "start" | "end" }
   | { kind: "marker"; id: string; startX: number; orig: number; moved: boolean };
+
+/**
+ * A row of the editor: all lamps on top, then one per lamp of the patch. Effect rows on a group (older
+ * timelines) are shown under them so nothing gets lost. `key` is what the lanes carry in data-track.
+ */
+type Row = { key: string; name: string; kind: "all" | "lamp" | "group"; target: string; track?: TimelineTrack };
+const ROW_H = 30; // px per line of clips in a row (overlapping clips go on a line of their own)
+
+/**
+ * Older timelines had a scene row and effect rows for all lamps: those become the one "all lamps" row
+ * (which then holds scenes, effects and colours), always the first row.
+ */
+function normalize(tl: Timeline): Timeline {
+  const isAll = (k: TimelineTrack) => k.kind === "all" || k.kind === "scenes" || (k.kind === "effects" && (k.target ?? "*") === "*");
+  const merged = tl.tracks.filter(isAll);
+  const main: TimelineTrack = merged.find((k) => k.kind === "all") ?? { id: uid(), name: "", kind: "all", target: "*", clips: [] };
+  const clips = merged.flatMap((k) => k.clips).sort((a, b) => a.startMs - b.startMs);
+  return { ...tl, tracks: [{ ...main, kind: "all", target: "*", clips }, ...tl.tracks.filter((k) => !isAll(k))] };
+}
+
+/** Puts overlapping clips of a row on separate lines: clip id -> line, and the number of lines. */
+function lines(clips: TimelineClip[]): { line: Map<string, number>; count: number } {
+  const ends: number[] = [];
+  const line = new Map<string, number>();
+  for (const c of [...clips].sort((a, b) => a.startMs - b.startMs || a.id.localeCompare(b.id))) {
+    let i = ends.findIndex((e) => e <= c.startMs + 0.5);
+    if (i < 0) { i = ends.length; ends.push(0); }
+    ends[i] = c.startMs + c.lengthMs;
+    line.set(c.id, i);
+  }
+  return { line, count: Math.max(1, ends.length) };
+}
 
 /** Starts dragging a colour, effect or preset from the tools towards the timeline (wherever it is shown). */
 export const startTimelineDrag: DragStart = (item, e) => {
@@ -62,7 +94,7 @@ export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     if (!currentId && server[0]) setCurrentId(server[0].id);
     const s = server.find((x) => x.id === currentId) ?? null;
-    if (!pending.current) setTl(s ? structuredClone(s) : null);
+    if (!pending.current) setTl(s ? normalize(structuredClone(s)) : null);
   }, [server, currentId]);
 
   useEffect(() => {
@@ -88,10 +120,7 @@ export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
   const create = async () => {
     const n: Timeline = {
       id: uid(), name: t("tl.new", { n: server.length + 1 }), lengthMs: 60000, bpm: 120, snap: true, loop: false, audioFile: null,
-      tracks: [
-        { id: uid(), name: t("tl.scenes"), kind: "scenes", target: "*", clips: [] },
-        { id: uid(), name: t("tl.effects"), kind: "effects", target: "*", clips: [] },
-      ],
+      tracks: [{ id: uid(), name: "", kind: "all", target: "*", clips: [] }],
     };
     await api.saveTimeline(n);
     setCurrentId(n.id);
@@ -127,37 +156,78 @@ export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
   const findClip = (id: string | null) => tl?.tracks.flatMap((k) => k.clips.map((c) => ({ track: k, clip: c }))).find((x) => x.clip.id === id);
   const sel = findClip(selected);
 
-  const updateClip = (clipId: string, change: Partial<TimelineClip>, toTrack?: string) => {
+  // the rows: all lamps, every lamp of the patch, then group rows of older timelines
+  const groups = full!.groups;
+  const rows: Row[] = !tl ? [] : [
+    { key: "all", name: t("fx.allLamps"), kind: "all", target: "*", track: tl.tracks.find((k) => k.kind === "all") },
+    ...full!.patch.map((f): Row => ({ key: "lamp:" + f.id, name: f.name, kind: "lamp", target: f.id, track: tl.tracks.find((k) => k.kind === "lamp" && k.target === f.id) })),
+    ...tl.tracks.filter((k) => k.kind === "effects" && k.target !== "*")
+      .map((k): Row => ({ key: "track:" + k.id, name: groups.find((g) => g.id === k.target)?.name ?? k.name, kind: "group", target: k.target, track: k })),
+  ];
+  const rowOf = (track: TimelineTrack) => rows.find((r) => r.track?.id === track.id);
+  /** The rows a preset lands on: those of the lamps it was saved for, else "all lamps". */
+  const sceneRows = (scene: SceneInfo) => {
+    const lamps = scene.lamps?.filter((id) => full!.patch.some((f) => f.id === id));
+    return lamps?.length ? rows.filter((r) => r.kind === "lamp" && lamps.includes(r.target)) : rows.filter((r) => r.kind === "all");
+  };
+  /** The track of a row, made when the row gets its first clip. */
+  const trackFor = (next: Timeline, row: Row): [Timeline, string] => {
+    const have = next.tracks.find((k) => (row.track && k.id === row.track.id) || (row.kind === "lamp" && k.kind === "lamp" && k.target === row.target) || (row.kind === "all" && k.kind === "all"));
+    if (have) return [next, have.id];
+    const k: TimelineTrack = { id: uid(), name: row.name, kind: row.kind === "lamp" ? "lamp" : "all", target: row.target, clips: [] };
+    return [{ ...next, tracks: row.kind === "all" ? [k, ...next.tracks] : [...next.tracks, k] }, k.id];
+  };
+  /** A lamp row whose last clip went is no longer stored. */
+  const tidy = (next: Timeline): Timeline => ({ ...next, tracks: next.tracks.filter((k) => k.kind !== "lamp" || k.clips.length > 0) });
+
+  const updateClip = (clipId: string, change: Partial<TimelineClip>, toRow?: Row) => {
     if (!tl) return;
     const found = findClip(clipId);
     if (!found) return;
     const clip = { ...found.clip, ...change };
-    const tracks = tl.tracks.map((k) => {
+    let next = tl, target = found.track.id;
+    if (toRow) [next, target] = trackFor(tl, toRow);
+    const tracks = next.tracks.map((k) => {
       let clips = k.clips.filter((c) => c.id !== clipId);
-      if (k.id === (toTrack ?? found.track.id)) clips = [...clips, clip].sort((a, b) => a.startMs - b.startMs);
+      if (k.id === target) clips = [...clips, clip].sort((a, b) => a.startMs - b.startMs);
       return { ...k, clips };
     });
-    save({ ...tl, tracks });
+    save(tidy({ ...next, tracks }));
   };
 
   const solidIndex = effects.findIndex((e) => e.key === "all-ab");
-  const addClip = (trackId: string, startMs: number, item: Extract<Drag, { kind: "palette" }>["item"]) => {
+  const addClip = (rowKey: string, startMs: number, item: Extract<Drag, { kind: "palette" }>["item"]) => {
     if (!tl) return;
-    const track = tl.tracks.find((k) => k.id === trackId);
-    if (!track) return;
     const len = beatMs * 8;
+    // a preset lands on the rows of its own lamps: "all lamps", or each lamp it was saved for
+    if (item.type === "scene") {
+      const targets = sceneRows(item.scene);
+      let next = tl, first: string | null = null;
+      for (const row of targets) {
+        const clip: TimelineClip = { id: uid(), startMs, lengthMs: len, kind: "scene", sceneId: item.scene.id, effect: null, fadeMs: -1 };
+        let trackId: string;
+        [next, trackId] = trackFor(next, row);
+        next = { ...next, tracks: next.tracks.map((k) => (k.id === trackId ? { ...k, clips: [...k.clips, clip].sort((a, b) => a.startMs - b.startMs) } : k)) };
+        first ??= clip.id;
+      }
+      if (!first) return;
+      save({ ...next, lengthMs: Math.max(next.lengthMs, startMs + len) });
+      setSelected(first);
+      return;
+    }
+    const row = rows.find((r) => r.key === rowKey);
+    if (!row) return;
     let clip: TimelineClip | null = null;
-    if (item.type === "scene" && track.kind === "scenes")
-      clip = { id: uid(), startMs, lengthMs: len, kind: "scene", sceneId: item.scene.id, effect: null, fadeMs: -1 };
-    if (item.type === "effect" && track.kind === "effects")
+    if (item.type === "effect")
       clip = { id: uid(), startMs, lengthMs: len, kind: "effect", sceneId: null, effect: { ...full!.state.effect, effectIndex: item.fx.index, chaseId: item.chase?.id ?? null, screenSync: false }, fadeMs: -1 };
-    // a colour = "all lamps in colour A" with A and B the same: the lamps of the track simply take that colour
-    if (item.type === "color" && track.kind === "effects" && solidIndex >= 0)
+    // a colour = "all lamps in colour A" with A and B the same: the lamps of the row simply take that colour
+    if (item.type === "color" && solidIndex >= 0)
       clip = { id: uid(), startMs, lengthMs: len, kind: "effect", sceneId: null,
         effect: { ...full!.state.effect, effectIndex: solidIndex, chaseId: null, screenSync: false, colorA: item.hex, colorB: item.hex, colorPerLamp: false }, fadeMs: -1 };
     if (!clip) return;
-    const lengthMs = Math.max(tl.lengthMs, startMs + len);
-    save({ ...tl, lengthMs, tracks: tl.tracks.map((k) => (k.id === trackId ? { ...k, clips: [...k.clips, clip!].sort((a, b) => a.startMs - b.startMs) } : k)) });
+    const [next, trackId] = trackFor(tl, row);
+    const lengthMs = Math.max(next.lengthMs, startMs + len);
+    save({ ...next, lengthMs, tracks: next.tracks.map((k) => (k.id === trackId ? { ...k, clips: [...k.clips, clip!].sort((a, b) => a.startMs - b.startMs) } : k)) });
     setSelected(clip.id);
   };
 
@@ -190,12 +260,12 @@ export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
         const dx = (e.clientX - drag.startX) / pxPerMs;
         if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
         drag.moved = true;
-        const over = trackAt(e.clientX, e.clientY);
-        const target = tl.tracks.find((k) => k.id === over);
-        const origKind = tl.tracks.find((k) => k.id === drag.origTrack)?.kind;
-        const toTrack = target && target.kind === origKind ? target.id : drag.trackId;
-        updateClip(drag.clipId, { startMs: Math.max(0, snap(drag.origStart + dx)) }, toTrack);
-        if (toTrack !== drag.trackId) setDrag({ ...drag, trackId: toTrack });
+        // colours and effects move to any row; a preset stays on the rows of its lamps (only in time)
+        const over = rows.find((r) => r.key === trackAt(e.clientX, e.clientY));
+        const isScene = findClip(drag.clipId)?.clip.kind === "scene";
+        const to = over && over.key !== drag.row && !isScene ? over : undefined;
+        updateClip(drag.clipId, { startMs: Math.max(0, snap(drag.origStart + dx)) }, to);
+        if (to) setDrag({ ...drag, row: to.key });
       } else {
         const dx = (e.clientX - drag.startX) / pxPerMs;
         if (drag.kind === "resize-r") updateClip(drag.clipId, { lengthMs: Math.max(beatMs / 2, snap(drag.origStart + drag.origLen + dx) - drag.origStart) });
@@ -240,7 +310,6 @@ export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
 
   const width = tl.lengthMs * pxPerMs;
   const beatPx = beatMs * pxPerMs;
-  const groups = full!.groups;
 
   const upload = async (file: File) => {
     setUploading(file.name);
@@ -334,19 +403,18 @@ export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
                   <Waveform peaks={peaks} width={width} />
                 </div>
               )}
-              {tl.tracks.map((k) => (
-                <TrackRow key={k.id} track={k} width={width} beatPx={beatPx} pxPerMs={pxPerMs} scenes={scenes} effects={effects}
-                  groups={groups} selected={selected} fxName={fxName}
-                  dropOk={drag?.kind === "palette" && ((drag.item.type === "scene") === (k.kind === "scenes"))}
+              {rows.map((r) => (
+                <TrackRow key={r.key} row={r} width={width} beatPx={beatPx} pxPerMs={pxPerMs} scenes={scenes} effects={effects}
+                  selected={selected} fxName={fxName}
+                  dropOk={drag?.kind === "palette" && (drag.item.type !== "scene" || sceneRows(drag.item.scene).includes(r))}
                   solidIndex={solidIndex}
                   onSelect={setSelected}
-                  onTrack={(change) => save({ ...tl, tracks: tl.tracks.map((x) => (x.id === k.id ? { ...x, ...change } : x)) })}
-                  onRemoveTrack={() => save({ ...tl, tracks: tl.tracks.filter((x) => x.id !== k.id) })}
+                  onRemoveTrack={r.kind === "group" ? () => save({ ...tl, tracks: tl.tracks.filter((x) => x.id !== r.track!.id) }) : undefined}
                   onClipDown={(e, c, part) => {
                     e.stopPropagation(); e.preventDefault();
                     setSelected(c.id);
-                    if (part === "body") setDrag({ kind: "move", clipId: c.id, trackId: k.id, origTrack: k.id, startX: e.clientX, origStart: c.startMs, moved: false });
-                    else setDrag({ kind: part === "l" ? "resize-l" : "resize-r", clipId: c.id, trackId: k.id, startX: e.clientX, origStart: c.startMs, origLen: c.lengthMs });
+                    if (part === "body") setDrag({ kind: "move", clipId: c.id, row: r.key, startX: e.clientX, origStart: c.startMs, moved: false });
+                    else setDrag({ kind: part === "l" ? "resize-l" : "resize-r", clipId: c.id, startX: e.clientX, origStart: c.startMs, origLen: c.lengthMs });
                   }} />
               ))}
               {(tl.startMs ?? 0) > 0 && <div className="tl-outside" style={{ left: 160, width: (tl.startMs ?? 0) * pxPerMs }} />}
@@ -355,21 +423,14 @@ export function TimelineEditor({ embedded = false }: { embedded?: boolean }) {
               <div className="tl-playhead" style={{ left: 160 + playhead * pxPerMs }} />
             </div>
           </div>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn sm" onClick={() => save({ ...tl, tracks: [...tl.tracks, { id: uid(), name: t("tl.effects"), kind: "effects", target: "*", clips: [] }] })}>
-              <Icon name="plus" /> {t("tl.addEffectTrack")}
-            </button>
-            <button className="btn sm" onClick={() => save({ ...tl, tracks: [...tl.tracks, { id: uid(), name: t("tl.scenes"), kind: "scenes", target: "*", clips: [] }] })}>
-              <Icon name="plus" /> {t("tl.addSceneTrack")}
-            </button>
-          </div>
+          <p className="hint" style={{ margin: "8px 0 0" }}>{t("tl.rowsHint")}</p>
         </div>
       </div>
 
       {sel && (
-        <ClipInspector clip={sel.clip} track={sel.track} scenes={scenes} effects={effects} fxName={fxName}
+        <ClipInspector clip={sel.clip} rowName={rowOf(sel.track)?.name ?? sel.track.name} scenes={scenes} effects={effects} fxName={fxName}
           onChange={(c) => updateClip(sel.clip.id, c)}
-          onDelete={() => { save({ ...tl, tracks: tl.tracks.map((k) => ({ ...k, clips: k.clips.filter((c) => c.id !== sel.clip.id) })) }); setSelected(null); }} />
+          onDelete={() => { save(tidy({ ...tl, tracks: tl.tracks.map((k) => ({ ...k, clips: k.clips.filter((c) => c.id !== sel.clip.id) })) })); setSelected(null); }} />
       )}
 
       {drag?.kind === "palette" && (
@@ -407,29 +468,26 @@ function Waveform({ peaks, width }: { peaks: number[] | null; width: number }) {
   return <canvas ref={ref} className="tl-wave" style={{ width }} />;
 }
 
-function TrackRow({ track, width, beatPx, pxPerMs, scenes, effects, groups, selected, dropOk, solidIndex, fxName, onSelect, onTrack, onRemoveTrack, onClipDown }: {
-  track: TimelineTrack; width: number; beatPx: number; pxPerMs: number; scenes: SceneInfo[]; effects: EffectInfo[]; solidIndex: number;
-  groups: { id: string; name: string }[]; selected: string | null; dropOk: boolean; fxName: (e?: EffectInfo) => string;
-  onSelect: (id: string | null) => void; onTrack: (c: Partial<TimelineTrack>) => void; onRemoveTrack: () => void;
+function TrackRow({ row, width, beatPx, pxPerMs, scenes, effects, selected, dropOk, solidIndex, fxName, onSelect, onRemoveTrack, onClipDown }: {
+  row: Row; width: number; beatPx: number; pxPerMs: number; scenes: SceneInfo[]; effects: EffectInfo[]; solidIndex: number;
+  selected: string | null; dropOk: boolean; fxName: (e?: EffectInfo) => string;
+  onSelect: (id: string | null) => void; onRemoveTrack?: () => void;
   onClipDown: (e: RPointerEvent, c: TimelineClip, part: "body" | "l" | "r") => void;
 }) {
   const chases = useShow().full?.state.chases ?? [];
   const t = useT();
+  const clips = row.track?.clips ?? [];
+  const { line, count } = lines(clips);
   return (
-    <div className={"tl-row" + (dropOk ? " drop-ok" : "")}>
-      <div className="tl-head sticky">
-        <input className="tl-name" value={track.name} onChange={(e) => onTrack({ name: e.target.value })} />
-        {track.kind === "effects" ? (
-          <select className="tl-target" value={track.target} onChange={(e) => onTrack({ target: e.target.value })}>
-            <option value="*">{t("fx.allLamps")}</option>
-            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        ) : <span className="tl-kind">{t("tl.sceneTrack")}</span>}
-        <button className="tl-del" title={t("scenes.delete")} onClick={onRemoveTrack}>×</button>
+    <div className={"tl-row " + row.kind + (dropOk ? " drop-ok" : "")} style={{ height: count * ROW_H + 6 }}>
+      <div className="tl-head sticky" title={row.name}>
+        {row.kind === "all" ? <Icon name="grid" size={14} /> : row.kind === "lamp" ? <Icon name="bulb" size={14} /> : <Icon name="users" size={14} />}
+        <span className="tl-row-name ellipsis">{row.name}</span>
+        {onRemoveTrack && <button className="tl-del" title={t("scenes.delete")} onClick={onRemoveTrack}>×</button>}
       </div>
-      <div className="tl-lane" data-track={track.id} style={{ width, ["--beat" as string]: beatPx + "px" }}
+      <div className="tl-lane" data-track={row.key} style={{ width, ["--beat" as string]: beatPx + "px" }}
         onPointerDown={() => onSelect(null)}>
-        {track.clips.map((c) => {
+        {clips.map((c) => {
           const scene = c.kind === "scene" ? scenes.find((s) => s.id === c.sceneId) : undefined;
           const fx = c.kind === "effect" && c.effect ? effects[c.effect.effectIndex] : undefined;
           const bg = scene ? scene.color : `linear-gradient(90deg, ${c.effect?.colorA ?? "#555"}, ${c.effect?.colorB ?? "#333"})`;
@@ -438,7 +496,7 @@ function TrackRow({ track, width, beatPx, pxPerMs, scenes, effects, groups, sele
           const label = scene ? scene.name : solid ? t("tl.colorClip") : c.effect?.chaseId ? "★ " + (chases.find((x) => x.id === c.effect!.chaseId)?.name ?? "?") : fxName(fx);
           return (
             <div key={c.id} className={"tl-clip" + (selected === c.id ? " selected" : "")}
-              style={{ left: c.startMs * pxPerMs, width: Math.max(6, c.lengthMs * pxPerMs), background: bg, color: scene ? contrast(scene.color) : "#fff" }}
+              style={{ left: c.startMs * pxPerMs, width: Math.max(6, c.lengthMs * pxPerMs), top: 3 + (line.get(c.id) ?? 0) * ROW_H, height: ROW_H - 4, background: bg, color: scene ? contrast(scene.color) : "#fff" }}
               onPointerDown={(e) => onClipDown(e, c, "body")} title={label}>
               <span className="grip l" onPointerDown={(e) => onClipDown(e, c, "l")} />
               <span className="tl-clip-label">{label}</span>
@@ -451,8 +509,8 @@ function TrackRow({ track, width, beatPx, pxPerMs, scenes, effects, groups, sele
   );
 }
 
-function ClipInspector({ clip, track, scenes, effects, fxName, onChange, onDelete }: {
-  clip: TimelineClip; track: TimelineTrack; scenes: SceneInfo[]; effects: EffectInfo[]; fxName: (e?: EffectInfo) => string;
+function ClipInspector({ clip, rowName, scenes, effects, fxName, onChange, onDelete }: {
+  clip: TimelineClip; rowName: string; scenes: SceneInfo[]; effects: EffectInfo[]; fxName: (e?: EffectInfo) => string;
   onChange: (c: Partial<TimelineClip>) => void; onDelete: () => void;
 }) {
   const t = useT();
@@ -463,7 +521,7 @@ function ClipInspector({ clip, track, scenes, effects, fxName, onChange, onDelet
     <div className="card tl-inspector">
       <div className="row">
         <h2 style={{ marginRight: 8 }}>{clip.kind === "scene" ? t("tl.sceneClip") : t("tl.effectClip")}</h2>
-        <span className="muted">{track.name}</span>
+        <span className="muted">{rowName}</span>
         <div style={{ flex: 1 }} />
         <button className="btn sm ghost danger" onClick={onDelete}><Icon name="trash" /> {t("scenes.delete")}</button>
       </div>
