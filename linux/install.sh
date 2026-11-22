@@ -7,6 +7,8 @@
 #
 # Program: /opt/dmx-light-control   Show, settings and log: /var/lib/dmx-light-control
 # Service: dmx-light-control (user dmxlicht)   Web page: http://<this Pi>:5150
+# Updating from the app: /usr/local/lib/dmx-light-control/update.sh, which /etc/sudoers.d/dmx-light-control lets
+# the service user run as root (that script only, see update.sh for what it checks).
 set -euo pipefail
 
 APP=/opt/dmx-light-control
@@ -15,6 +17,9 @@ SERVICE=dmx-light-control
 UNIT=/etc/systemd/system/$SERVICE.service
 RULE=/etc/udev/rules.d/60-udmx.rules
 USER_NAME=dmxlicht
+HELPER_DIR=/usr/local/lib/dmx-light-control
+HELPER=$HELPER_DIR/update.sh
+SUDOERS=/etc/sudoers.d/dmx-light-control
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -24,7 +29,8 @@ fi
 
 if [ "${1:-}" = "--uninstall" ] || [ "${1:-}" = "--purge" ]; then
   systemctl disable --now "$SERVICE" 2>/dev/null || true
-  rm -f "$UNIT" "$RULE"
+  rm -f "$UNIT" "$RULE" "$SUDOERS"
+  rm -rf "$HELPER_DIR"
   systemctl daemon-reload
   udevadm control --reload-rules 2>/dev/null || true
   rm -rf "$APP"
@@ -50,10 +56,11 @@ case "$(uname -m)" in
      exit 1 ;;
 esac
 
-echo "[1/5] Benodigde pakketten..."
+echo "[1/6] Benodigde pakketten..."
 need=()
 ldconfig -p | grep -q 'libusb-1.0.so.0' || need+=(libusb-1.0-0)
 command -v arecord >/dev/null 2>&1 || need+=(alsa-utils)
+command -v curl >/dev/null 2>&1 || need+=(curl)        # the update helper fetches the checksum from GitHub
 if ! ldconfig -p | grep -q 'libicuuc.so'; then
   icu="$(apt-cache search --names-only '^libicu[0-9]+$' 2>/dev/null | awk '{print $1}' | sort -V | tail -n 1)"
   need+=("${icu:-libicu-dev}")
@@ -64,7 +71,7 @@ if [ ${#need[@]} -gt 0 ]; then
   apt-get install -y -qq "${need[@]}"
 fi
 
-echo "[2/5] Gebruiker $USER_NAME..."
+echo "[2/6] Gebruiker $USER_NAME..."
 if ! id "$USER_NAME" >/dev/null 2>&1; then
   useradd --system --home-dir "$DATA" --no-create-home --shell /usr/sbin/nologin "$USER_NAME"
 fi
@@ -72,12 +79,12 @@ for g in plugdev audio systemd-journal; do
   getent group "$g" >/dev/null && usermod -aG "$g" "$USER_NAME"
 done
 
-echo "[3/5] Programma naar $APP..."
+echo "[3/6] Programma naar $APP..."
 systemctl stop "$SERVICE" 2>/dev/null || true
 rm -rf "$APP.new" "$APP.old"
 mkdir -p "$APP.new"
 cp -a "$HERE/DmxLicht" "$HERE/wwwroot" "$APP.new/"
-for f in LEESMIJ-Linux.txt install.sh 60-udmx.rules dmx-light-control.service; do
+for f in LEESMIJ-Linux.txt install.sh update.sh 60-udmx.rules dmx-light-control.service; do
   [ -f "$HERE/$f" ] && cp "$HERE/$f" "$APP.new/"
 done
 # a tar.gz made on Windows has no Unix rights (everything 0666): set them here
@@ -98,12 +105,37 @@ fi
 chown -R "$USER_NAME:$USER_NAME" "$DATA"
 chmod -R u=rwX,g=rX,o= "$DATA"
 
-echo "[4/5] udev-regel voor de uDMX..."
+echo "[4/6] udev-regel voor de uDMX..."
 install -m 644 "$HERE/60-udmx.rules" "$RULE"
 udevadm control --reload-rules
 udevadm trigger --subsystem-match=usb --attr-match=idVendor=16c0 || true
 
-echo "[5/5] Service $SERVICE..."
+echo "[5/6] Bijwerken vanuit de app..."
+# the service may run the update helper as root, and nothing else; without it the app shows the manual way
+if [ -f "$HERE/update.sh" ] && command -v visudo >/dev/null 2>&1 && command -v systemd-run >/dev/null 2>&1; then
+  install -d -m 755 -o root -g root "$HELPER_DIR"
+  install -m 755 -o root -g root "$HERE/update.sh" "$HELPER.new"
+  mv -f "$HELPER.new" "$HELPER"
+  rules="$(mktemp)"
+  {
+    echo "# DMX Light Control (written by install.sh): the service may run its update helper as root, nothing else."
+    echo "# Remove this file to switch updating from the app off."
+    echo "Defaults!$HELPER !requiretty"
+    echo "$USER_NAME ALL=(root) NOPASSWD: $HELPER"
+  } > "$rules"
+  if visudo -cqf "$rules"; then
+    install -m 440 -o root -g root "$rules" "$SUDOERS"
+  else
+    echo "      sudoers-regel klopt niet; bijwerken vanuit de app staat uit"
+    rm -f "$SUDOERS"
+  fi
+  rm -f "$rules"
+else
+  echo "      niet beschikbaar (sudo/visudo of systemd-run ontbreekt); bijwerken gaat met dit script"
+  rm -f "$SUDOERS"
+fi
+
+echo "[6/6] Service $SERVICE..."
 install -m 644 "$HERE/dmx-light-control.service" "$UNIT"
 systemctl daemon-reload
 systemctl enable "$SERVICE" >/dev/null 2>&1

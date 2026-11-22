@@ -225,7 +225,7 @@ export const en: Record<string, string> = {
   "linux.noScreen": "Screen sync and the webcam are not available on the Raspberry Pi / Linux version.",
   "linux.noSongs": "Playing a song with a timeline is not available on the Raspberry Pi / Linux version. The timeline runs without sound.",
   "linux.noSongsShort": "no songs on Linux",
-  "linux.update": "On the Raspberry Pi: download DMX-Light-Control-<version>-linux-arm64.tar.gz and run sudo bash install.sh (your show stays).",
+  "linux.update": "This Pi cannot update itself yet: download DMX-Light-Control-<version>-linux-arm64.tar.gz once and run sudo bash install.sh (your show stays). After that, updating works here with one click.",
   "linux.companion": "Companion on another computer connects to this Pi over the network: add a DMX Light Control connection with this Pi's address and port 5150. The module is installed from the Windows version.",
   "linux.fault.DriverMissing": "The uDMX was found, but the app may not use it (udev rule or libusb missing).",
   "linux.tipDriver": "Run sudo bash install.sh again (it installs libusb and the udev rule 60-udmx.rules), then unplug and replug the dongle.",

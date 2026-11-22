@@ -78,13 +78,30 @@ public static class SceneOps
         return c;
     }
 
-    public static void Apply(SceneState scene, ShowState s)
+    /// <summary>The look all lamps of the scene share (a one-colour preset like "Warm wit"), or null.</summary>
+    public static FixtureLook UniformLook(SceneState sc)
+    {
+        if (sc?.Looks == null || sc.Looks.Count == 0) return null;
+        FixtureLook first = sc.Looks.Values.First();
+        bool same = sc.Looks.Values.All(l => l != null && l.On == first.On
+            && string.Equals(l.Color?.Key, first.Color?.Key, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(l.Color?.Hex, first.Color?.Hex, StringComparison.OrdinalIgnoreCase));
+        return same ? Clone(first) : null;
+    }
+
+    /// <summary>
+    /// Recalls a scene. Lamps the scene does not know (added after it was saved, re-added, or a scene from
+    /// another patch) used to lose their look and go dark: with <paramref name="patch"/> a one-colour scene
+    /// gives them that colour too, any other scene leaves them as they are.
+    /// </summary>
+    public static void Apply(SceneState scene, ShowState s, IEnumerable<string> patch = null)
     {
         SceneState c = Clone(scene);
         s.Mode = c.Mode;
-        // lamps the scene does not know (added after it was saved, or a scene from another patch) keep their
-        // look: they used to lose it and go dark
         Dictionary<string, FixtureLook> looks = c.Looks ?? new();
+        if (patch != null && UniformLook(c) is FixtureLook u)
+            foreach (string id in patch)
+                if (!looks.ContainsKey(id)) looks[id] = Clone(u);
         foreach (var kv in s.Looks ?? new()) looks.TryAdd(kv.Key, kv.Value);
         Dictionary<string, byte[]> faders = c.Faders ?? new();
         foreach (var kv in s.Faders ?? new()) faders.TryAdd(kv.Key, kv.Value);

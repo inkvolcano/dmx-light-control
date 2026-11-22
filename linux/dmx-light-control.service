@@ -13,6 +13,8 @@ User=dmxlicht
 Group=dmxlicht
 # groups (set by install.sh): plugdev = the uDMX (udev rule), audio = microphone and MIDI,
 # systemd-journal = USB events in the problem report
+# no NoNewPrivileges= (or other sandboxing that blocks sudo): "install update" in the app runs the root update
+# helper through sudo (only that script, see /etc/sudoers.d/dmx-light-control)
 # the show, settings, songs and the log live here (the program folder /opt/dmx-light-control stays read-only)
 Environment=DMXLICHT_DATA=/var/lib/dmx-light-control
 Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/dmx-light-control/.net

@@ -94,7 +94,7 @@ public static class Commands
                 {
                     Scene sc = engine.Read(s => Find(s.Scenes, a0, x => x.Name));
                     if (sc == null) return "scene not found: " + a0;
-                    engine.Change(s => { SceneOps.Apply(sc.State, s.State); s.State.ActiveScene = sc.Id; }, fade: Fade(sc.FadeMs), cut: true);
+                    engine.Change(s => { SceneOps.Apply(sc.State, s.State, s.Patch.Select(p => p.Id)); s.State.ActiveScene = sc.Id; }, fade: Fade(sc.FadeMs), cut: true);
                     return "ok";
                 }
                 case "blackout":

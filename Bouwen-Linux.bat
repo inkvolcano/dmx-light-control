@@ -34,7 +34,7 @@ dotnet publish src\DmxLicht.App -f net9.0 -c Release -r %RID% --self-contained t
 
 echo [3/4] Installatiebestanden...
 rem altijd LF-regeleinden: een script met Windows-regeleinden start niet op Linux
-powershell -NoProfile -Command "foreach ($f in 'install.sh','dmx-light-control.service','60-udmx.rules','LEESMIJ-Linux.txt') { $t = [IO.File]::ReadAllText((Resolve-Path ('linux\' + $f))).Replace([string][char]13, ''); [IO.File]::WriteAllText((Join-Path (Resolve-Path '%STAGE%') $f), $t) }" || goto fail
+powershell -NoProfile -Command "foreach ($f in 'install.sh','update.sh','dmx-light-control.service','60-udmx.rules','LEESMIJ-Linux.txt') { $t = [IO.File]::ReadAllText((Resolve-Path ('linux\' + $f))).Replace([string][char]13, ''); [IO.File]::WriteAllText((Join-Path (Resolve-Path '%STAGE%') $f), $t) }" || goto fail
 
 echo [4/4] tar.gz maken...
 if exist publish\%NAME%.tar.gz del /q publish\%NAME%.tar.gz

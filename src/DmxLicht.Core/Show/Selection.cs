@@ -37,9 +37,11 @@ public static class Selection
     public static void ApplyScene(Scene scene, ShowState s, IReadOnlyCollection<string> ids)
     {
         SceneState st = SceneOps.Clone(scene.State);
+        FixtureLook all = SceneOps.UniformLook(st);   // a one-colour scene also colours lamps it does not know
         foreach (string id in ids)
         {
             if (st.Looks != null && st.Looks.TryGetValue(id, out FixtureLook look)) s.Looks[id] = look;
+            else if (all != null) s.Looks[id] = SceneOps.Clone(all);
             if (st.Faders != null && st.Faders.TryGetValue(id, out byte[] f)) s.Faders[id] = f;
         }
         if (st.Mode == OutputMode.Effect)

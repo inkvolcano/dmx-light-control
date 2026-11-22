@@ -8,7 +8,7 @@ NODIG
   Een 32-bit Raspberry Pi OS werkt niet.
 - Netwerk (wifi of kabel), en voor de uDMX-dongle een vrije USB-poort.
 
-INSTALLEREN (ook voor een nieuwe versie)
+INSTALLEREN
 1. Kopieer DMX-Light-Control-<versie>-linux-arm64.tar.gz naar de Pi (bijv. met scp of een USB-stick).
 2. Op de Pi:
      tar xzf DMX-Light-Control-<versie>-linux-arm64.tar.gz
@@ -18,6 +18,22 @@ INSTALLEREN (ook voor een nieuwe versie)
    zet de udev-regel voor de dongle en start de dienst. Bij een nieuwe versie blijft je show staan.
 3. Het script toont het adres en de koppelcode, bijvoorbeeld:
      http://192.168.1.20:5150    of    http://<naam-van-de-pi>.local:5150
+
+BIJWERKEN NAAR EEN NIEUWE VERSIE
+- Vanuit de app: Instellingen > Updates > "Bijwerken en opnieuw starten", vanaf elk gekoppeld apparaat.
+  De app downloadt het pakket en controleert het; een hulpscript installeert het en herstart de dienst.
+  Het licht staat dan even stil. Start de nieuwe versie niet, dan zet het script de vorige
+  terug en zie je in de app waarom. Je show blijft altijd staan.
+- Met de hand kan ook nog steeds: de nieuwe tar.gz uitpakken en sudo bash install.sh (zie boven).
+- Geinstalleerd met versie 2.1.43 of ouder? Dan staat er nog geen hulpscript en toont de app de
+  handmatige manier. Installeer een keer met de hand; daarna werkt de knop.
+- Hoe het ging:   journalctl -u dmx-light-control-update
+- Hoe het werkt: install.sh zet /usr/local/lib/dmx-light-control/update.sh neer (van root) en de regel
+  /etc/sudoers.d/dmx-light-control, die de gebruiker dmxlicht alleen dat script als root laat draaien.
+  Het script vertrouwt de app niet: het haalt zelf het controlegetal van GitHub en draait dan de
+  install.sh uit het nieuwe pakket, net als met de hand. Bijwerken vanuit de app uitzetten:
+     sudo rm /etc/sudoers.d/dmx-light-control
+  (een volgende install.sh zet hem terug). Nodig: curl (installeert install.sh zelf).
 
 SHOW VAN WINDOWS MEENEMEN
 - Zet bij de EERSTE installatie de map "Instellingen" van je Windows-pc naast install.sh
@@ -40,7 +56,8 @@ DE DIENST
                (het logboek van de app zelf: /var/lib/dmx-light-control/dmx-log.txt)
 - Herstarten:  sudo systemctl restart dmx-light-control
 - Stoppen:     sudo systemctl stop dmx-light-control   (niet meer bij het opstarten: sudo systemctl disable ...)
-- Verwijderen: sudo bash /opt/dmx-light-control/install.sh --uninstall   (show blijft staan)
+- Verwijderen: sudo bash /opt/dmx-light-control/install.sh --uninstall   (show blijft staan; ook het
+               hulpscript en de sudoers-regel gaan weg)
                sudo bash /opt/dmx-light-control/install.sh --purge       (alles weg)
 - Programma:   /opt/dmx-light-control      Show, instellingen, liedjes, log: /var/lib/dmx-light-control
 
@@ -62,7 +79,6 @@ GELUID EN MIDI
 WAT (NOG) NIET WERKT OP LINUX
 - Scherm volgen en de webcam (Effecten > Scherm volgen).
 - Een liedje afspelen bij een tijdlijn (de tijdlijn loopt wel, zonder geluid; liedjes uploaden kan niet).
-- Automatisch bijwerken: installeer een nieuwe versie met install.sh (zie boven).
 - De Companion-module installeren vanuit de app: Companion op een andere computer verbindt gewoon
   via het netwerk met de Pi (adres van de Pi, poort 5150).
 - Windows-zaken: firewall-knop, USB-stroombesparing (doet de udev-regel), het venster en de tray.

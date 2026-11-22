@@ -9,6 +9,8 @@ export interface UpdateInfo {
   current: string; latest: string | null; available: boolean; notes: string | null; url: string | null; published: string | null;
   /** The newest release's Raspberry Pi package, if it has one. */
   piUrl?: string | null;
+  /** False on a Pi installed before the update helper existed (2.1.43 or older): install by hand once. */
+  canInstall?: boolean;
   state: string; progress: number; error: string | null; lastCheck: string | null; repo: string;
 }
 
@@ -18,6 +20,8 @@ export function UpdateCard({ settings, save }: { settings: AppSettings; save: (c
   const [info, setInfo] = useState<UpdateInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const local = ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
+  // Windows: only on the PC itself. The Pi has no screen: any paired device, once install.sh put the update helper there.
+  const canInstall = onLinux() ? info?.canInstall === true : local;
   useEffect(() => {
     let alive = true;
     const load = () => api.update().then((i) => alive && setInfo(i)).catch(() => {});
@@ -43,12 +47,10 @@ export function UpdateCard({ settings, save }: { settings: AppSettings; save: (c
             {info.notes && <pre className="upd-notes">{info.notes}</pre>}
             {info.state === "downloading" && <div className="upd-bar"><span style={{ width: info.progress + "%" }} /></div>}
             {info.state === "installing" && <span>{t("upd.installing")}</span>}
-            {onLinux()
-              ? <span className="hint">{t("linux.update")}</span>
-              : local
+            {canInstall
               ? <button className="btn primary" style={{ alignSelf: "flex-start" }} disabled={info.state === "downloading" || info.state === "installing"} onClick={install}>
                   <Icon name="refresh" /> {t("upd.install")}</button>
-              : <span className="hint">{t("upd.onlyHere")}</span>}
+              : <span className="hint">{t(onLinux() ? "linux.update" : "upd.onlyHere")}</span>}
           </div>
         </div>
       ) : info?.latest ? <p className="hint">{t("upd.upToDate")}</p> : null}

@@ -156,4 +156,29 @@ public class SelectionTests
         Assert.True(s.Looks["new"].On);
         Assert.Equal("green", s.Looks["new"].Color.Key);
     }
+
+    [Fact]
+    public void AOneColourSceneAlsoColoursLampsItDoesNotKnow()
+    {
+        // "Warm wit" saved before the lamps were added again (new ids): every lamp still gets warm white
+        var scene = new SceneState();
+        scene.Looks["old1"] = new FixtureLook { On = true, Color = ColorRef.Palette("warm-white") };
+        scene.Looks["old2"] = new FixtureLook { On = true, Color = ColorRef.Palette("warm-white") };
+        var s = new ShowState();
+        s.Looks["n1"] = new FixtureLook { On = true, Color = ColorRef.Palette("red") };
+        SceneOps.Apply(scene, s, new[] { "n1", "n2" });
+        Assert.Equal("warm-white", s.Looks["n1"].Color.Key);
+        Assert.True(s.Looks["n2"].On);
+        Assert.Equal("warm-white", s.Looks["n2"].Color.Key);
+        // a scene of several colours leaves lamps it does not know as they are
+        scene.Looks["old2"] = new FixtureLook { On = true, Color = ColorRef.Palette("blue") };
+        s.Looks["n1"] = new FixtureLook { On = true, Color = ColorRef.Palette("red") };
+        SceneOps.Apply(scene, s, new[] { "n1" });
+        Assert.Equal("red", s.Looks["n1"].Color.Key);
+        // a one-colour scene on some chosen lamps
+        var sc = new Scene { State = new SceneState() };
+        sc.State.Looks["old1"] = new FixtureLook { On = true, Color = ColorRef.Palette("warm-white") };
+        Selection.ApplyScene(sc, s, new[] { "n1" });
+        Assert.Equal("warm-white", s.Looks["n1"].Color.Key);
+    }
 }

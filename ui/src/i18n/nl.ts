@@ -154,7 +154,7 @@ export const nl: Record<string, string> = {
   "linux.noScreen": "Scherm volgen en de webcam werken niet in de Raspberry Pi / Linux-versie.",
   "linux.noSongs": "Een liedje afspelen bij een tijdlijn kan niet in de Raspberry Pi / Linux-versie. De tijdlijn loopt wel, zonder geluid.",
   "linux.noSongsShort": "geen liedjes op Linux",
-  "linux.update": "Op de Raspberry Pi: download DMX-Light-Control-<versie>-linux-arm64.tar.gz en draai sudo bash install.sh (je show blijft staan).",
+  "linux.update": "Deze Pi kan nog niet zelf bijwerken: download een keer DMX-Light-Control-<versie>-linux-arm64.tar.gz en draai sudo bash install.sh (je show blijft staan). Daarna werkt bijwerken hier met een klik.",
   "linux.companion": "Companion op een andere computer verbindt via het netwerk met deze Pi: voeg een DMX Light Control-verbinding toe met het adres van de Pi en poort 5150. De module installeer je vanuit de Windows-versie.",
   "linux.fault.DriverMissing": "De uDMX is gevonden, maar de app mag hem niet gebruiken (udev-regel of libusb ontbreekt).",
   "linux.tipDriver": "Draai sudo bash install.sh opnieuw (dat zet libusb en de udev-regel 60-udmx.rules), en steek de dongle daarna opnieuw in.",

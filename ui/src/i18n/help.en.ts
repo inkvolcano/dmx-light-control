@@ -627,7 +627,7 @@ Let the light do things by itself at set moments.
   "out.multiHint": "This show uses {n} universes. Art-Net and sACN send all of them: the first on the number above, the next ones on +1, +2, ...",
   "out.multiHelp": "Example: Art-Net universe 0 above means show universe 1 on Art-Net 0, universe 2 on Art-Net 1, etc. The USB dongle has one cable and so sends one universe; choose which above.",
   "upd.title": "Updates",
-  "upd.help": "New versions come from GitHub (github.com/inkvolcano/dmx-light-control). Updating downloads the new version, verifies it (checksum) and the app replaces itself, then restarts. Your show and settings (the Instellingen folder) stay.",
+  "upd.help": "New versions come from GitHub (github.com/inkvolcano/dmx-light-control). Updating downloads the new version, verifies it (checksum) and the app replaces itself, then restarts. Your show and settings (the Instellingen folder) stay. On a Raspberry Pi a helper script installs the new version and restarts the service; if it does not start, the previous version comes back.",
   "upd.current": "This version: {v}",
   "upd.available": "New version available: {v}",
   "upd.upToDate": "You have the latest version.",

@@ -223,7 +223,7 @@ public sealed class TimelinePlayer
                 else
                 {
                     List<EffectLayer> mine = show.State.Layers.Where(l => l.Source == Source).ToList();
-                    SceneOps.Apply(sc.State, show.State);
+                    SceneOps.Apply(sc.State, show.State, show.Patch.Select(p => p.Id));
                     show.State.Layers.AddRange(mine);
                     show.State.ActiveScene = sc.Id;
                 }

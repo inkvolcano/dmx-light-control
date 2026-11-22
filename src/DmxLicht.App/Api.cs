@@ -710,7 +710,7 @@ static class Api
                 // the scene's own lamps (all, or the ones it was saved for), and of those the ones chosen on the stage
                 List<string> ids = SceneOps.LampsOf(sc, patch) ?? patch;
                 if (chosen.Length > 0) ids = ids.Intersect(chosen).ToList();
-                if (ids.Count >= patch.Count) { SceneOps.Apply(sc.State, s.State); s.State.ActiveScene = sc.Id; }
+                if (ids.Count >= patch.Count) { SceneOps.Apply(sc.State, s.State, patch); s.State.ActiveScene = sc.Id; }
                 else if (ids.Count > 0) Selection.ApplyScene(sc, s.State, ids);
             }, fade: sc.FadeMs);
             return Results.Ok();
@@ -985,6 +985,8 @@ static class Api
             notes = Updater.Latest?.Notes,
             url = Updater.Latest?.Url,
             piUrl = Updater.Latest?.PiUrl,
+            // Linux: false on an install without the update helper (2.1.43 or older): the UI shows the manual way
+            canInstall = Updater.CanInstall,
             published = Updater.Latest?.Published,
             state = Updater.State,
             progress = Updater.Progress,
@@ -996,7 +998,9 @@ static class Api
         api.MapPost("/update/check", async () => { await Updater.CheckAsync(); return Results.Json(UpdateInfo(), Json.Compact); });
         api.MapPost("/update/install", (HttpContext ctx) =>
         {
-            if (LocalOnly(ctx) is IResult denied) return denied;   // replacing the program: only from this PC
+            // replacing the program: on Windows only from this PC. The Pi has no screen, so there it is any paired
+            // device (pairing and the PIN lock still apply); it only ever installs the newest checked GitHub release.
+            if (OperatingSystem.IsWindows() && LocalOnly(ctx) is IResult denied) return denied;
             _ = Task.Run(() => Updater.InstallAsync(() => Program.ExitApp()));
             return Results.Json(UpdateInfo(), Json.Compact);
         });
