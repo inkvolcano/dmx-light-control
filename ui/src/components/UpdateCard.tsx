@@ -7,6 +7,8 @@ import { onLinux } from "../store";
 
 export interface UpdateInfo {
   current: string; latest: string | null; available: boolean; notes: string | null; url: string | null; published: string | null;
+  /** The newest release's Raspberry Pi package, if it has one. */
+  piUrl?: string | null;
   state: string; progress: number; error: string | null; lastCheck: string | null; repo: string;
 }
 

@@ -978,6 +978,7 @@ static class Api
             available = Updater.Available,
             notes = Updater.Latest?.Notes,
             url = Updater.Latest?.Url,
+            piUrl = Updater.Latest?.PiUrl,
             published = Updater.Latest?.Published,
             state = Updater.State,
             progress = Updater.Progress,

@@ -501,6 +501,7 @@ input[type="range"] { accent-color: var(--accent); }
 .tl-lib-tabs button { flex: 1; }
 .tl-swatches .swatch { cursor: grab; }
 .drag-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; border: 1px solid rgba(255, 255, 255, 0.2); }
+.pi-cmd { font: 12px/1.5 var(--mono, monospace); white-space: pre-wrap; word-break: break-all; color: var(--text); }
 .slot-menu-wrap { position: relative; display: flex; }
 .slot-menu-wrap .popover { padding: 6px; width: 260px; gap: 0; }
 .rail-slot .slot-menu-wrap { position: absolute; right: 2px; top: 3px; bottom: 3px; }

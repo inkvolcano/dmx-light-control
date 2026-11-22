@@ -69,7 +69,12 @@ if ($Release) {
     Copy-Item $z $old -Force
     $h = (Get-FileHash $old -Algorithm SHA256).Hash.ToLower()
     [IO.File]::WriteAllText($oldS, "$h  DmxLicht-$version.zip`n")
-    gh release create "v$version" $z $s "$old#Auto-update for 2.1.16 and older (zip)" "$oldS#Auto-update for 2.1.16 and older (checksum)" `
+    # the Raspberry Pi package of the same version, when Bouwen-Linux.bat made it
+    $pi = "publish\DMX-Light-Control-$version-linux-arm64.tar.gz"
+    $extra = @()
+    if (Test-Path $pi) { $extra += $pi; if (Test-Path "$pi.sha256") { $extra += "$pi.sha256" } }
+    else { Write-Host "No Raspberry Pi package for $version (run Bouwen-Linux.bat to add it)." }
+    gh release create "v$version" $z $s "$old#Auto-update for 2.1.16 and older (zip)" "$oldS#Auto-update for 2.1.16 and older (checksum)" @extra `
         --repo $Repo --title "DMX Light Control $version" --notes-file $nf --target main
     Remove-Item $nf, $old, $oldS -ErrorAction SilentlyContinue
 }

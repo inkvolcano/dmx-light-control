@@ -23,7 +23,8 @@ static class Updater
     static readonly string Suffix = OperatingSystem.IsWindows() ? ".zip"
         : "-linux-" + System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant() + ".tar.gz";
 
-    public sealed record Release(string Version, string Notes, string Url, string ZipUrl, string ShaUrl, DateTime? Published);
+    /// <summary>A release; PiUrl = its Raspberry Pi package (linux-arm64), when the release has one.</summary>
+    public sealed record Release(string Version, string Notes, string Url, string ZipUrl, string ShaUrl, DateTime? Published, string PiUrl = null);
 
     public static string State { get; private set; } = "idle";   // idle, checking, downloading, ready, installing, error
     public static string Error { get; private set; }
@@ -82,8 +83,9 @@ static class Updater
                 string s = assets.FirstOrDefault(a => a.name.Equals($"{prefix}{version}{Suffix}.sha256", StringComparison.OrdinalIgnoreCase)).url;
                 if (z != null && s != null) { zip = z; sha = s; break; }
             }
+            string pi = assets.FirstOrDefault(a => a.name.EndsWith("-linux-arm64.tar.gz", StringComparison.OrdinalIgnoreCase)).url;
             Latest = new Release(version, j.TryGetProperty("body", out var b) ? b.GetString() : "", j.GetProperty("html_url").GetString(), zip, sha,
-                j.TryGetProperty("published_at", out var p) && p.ValueKind == JsonValueKind.String ? p.GetDateTime() : null);
+                j.TryGetProperty("published_at", out var p) && p.ValueKind == JsonValueKind.String ? p.GetDateTime() : null, pi);
             LastCheck = DateTime.Now;
             State = "idle";
             if (Available) Log.Write("Nieuwe versie beschikbaar: " + version);

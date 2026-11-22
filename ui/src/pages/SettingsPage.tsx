@@ -8,9 +8,10 @@ import { EasyCard, PhoneCard } from "../components/PhoneCard";
 import { hideable } from "./pageList";
 import { ReportCard } from "../components/ReportCard";
 import { UpdateCard } from "../components/UpdateCard";
+import { PiCard } from "../components/PiCard";
 import { ShowsCard } from "../components/ShowsCard";
 import { languages, useT } from "../i18n";
-import { currentSettings, reloadBootstrap, updateSettings, useShow } from "../store";
+import { currentSettings, onLinux, reloadBootstrap, updateSettings, useShow } from "../store";
 
 function LockCard({ hasPin, locked }: { hasPin: boolean; locked: boolean }) {
   const t = useT();
@@ -100,6 +101,7 @@ export function SettingsPage() {
         <OutputCard settings={s} save={save} />
         <ReportCard />
         <UpdateCard settings={s} save={save} />
+        {!onLinux() && <PiCard />}
         <OutputsCard settings={s} save={save} />
 
         <div className="card stack">
