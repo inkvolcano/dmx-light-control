@@ -67,6 +67,22 @@ h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: 
 .rail-fold { align-self: flex-start; width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--radius-sm); border: 1px solid var(--line-2); background: var(--panel-2); color: var(--muted); cursor: pointer; }
 .rail-fold:hover { color: var(--text); background: var(--panel-3); }
 .rail.folded .rail-fold { align-self: center; }
+.rail-top { display: flex; align-items: center; gap: 6px; }
+.rail.folded .rail-top { flex-direction: column; }
+.rail-search { flex: 1; min-width: 0; height: 30px; justify-content: flex-start; color: var(--muted); font-size: 13px; }
+.rail-search .grow { flex: 1; text-align: left; }
+.rail-search kbd { font-size: 10.5px; }
+/* "Nu actief" in the top bar, with its list in a pop-up */
+.now-wrap { position: relative; min-width: 0; }
+.now-btn { max-width: 300px; min-width: 0; gap: 6px; color: var(--muted); }
+.now-btn.running { color: var(--text); }
+.now-btn.running svg { color: var(--accent); }
+.now-btn .now-label { flex: none; }
+.now-btn .now-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.now-btn .now-more { height: 20px; padding: 0 7px; font-size: 11px; flex: none; }
+.now-pop { position: absolute; right: 0; top: calc(100% + 6px); width: 300px; z-index: 60; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: var(--radius); }
+.now-pop .rail-card { background: var(--panel); }
+@media (max-width: 1200px) { .now-btn .now-label { display: none; } .now-btn { max-width: 200px; } }
 .rail-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 9px; }
 .rail-head { display: flex; align-items: center; gap: 7px; font-size: 13px; }
 .rail-head .grow, .rail-now .grow, .rail-row .grow { flex: 1; min-width: 0; }

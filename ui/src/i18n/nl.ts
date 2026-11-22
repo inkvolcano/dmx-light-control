@@ -331,6 +331,7 @@ export const nl: Record<string, string> = {
   "scenes.lamps": "{n} lampen",
   "scenes.lampsHint": "Opgeslagen met alleen deze lampen gekozen: de preset verandert alleen die lampen, en komt op de tijdlijn op hun rijen.",
   "tl.rowsHint": "Bovenste rij = alle lampen, daaronder elke lamp. Sleep kleuren en effecten naar een rij; een preset komt vanzelf op de rijen van zijn lampen.",
+  "now.static": "Vaste kleuren",
   "nav.music": "Muziek",
   "music.title": "Muziek",
   "music.listening": "Luistert",

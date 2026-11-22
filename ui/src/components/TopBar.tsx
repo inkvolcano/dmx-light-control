@@ -3,6 +3,7 @@ import { api, throttle } from "../api";
 import { useT } from "../i18n";
 import { useLive, useShow } from "../store";
 import { Icon } from "./Icon";
+import { NowButton } from "./LiveRail";
 
 /** The bar over every page. With the right column shown, tempo and "what runs" live there instead of here. */
 // fade: 0 to 30 s on a curve, so short fades get most of the slider (0 = direct)
@@ -122,9 +123,7 @@ export function TopBar({ rail }: { rail: boolean }) {
         <StrobeSpeed value={s.strobeSpeed} onChange={sendStrobe} title={t("live.strobeSpeed")} />
       </div>
       <div className="grow" />
-      <button className="btn ghost search-btn" title={t("cmd.title") + " (Ctrl+K)"} onClick={() => window.dispatchEvent(new Event("dmx-search"))}>
-        <Icon name="search" /> <span className="search-label">{t("cmd.short")}</span> <kbd>Ctrl K</kbd>
-      </button>
+      <NowButton />
       <button className="btn ghost icon-btn" title={t("top.undo")} disabled={!full.undo} onClick={() => api.undo()}><Icon name="undo" /></button>
       <button className="btn ghost icon-btn" title={t("top.redo")} disabled={!full.redo} onClick={() => api.redo()}><Icon name="redo" /></button>
       {!rail && (s.music.syncEffects || s.music.modulation !== "none" || s.music.enabled) && (

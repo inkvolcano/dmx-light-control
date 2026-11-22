@@ -71,6 +71,8 @@ export function EffectsPanel({ selected = [], onDrag, requireSelection = false }
   const layers = full!.state.layers;
   // lamps chosen on the stage: their own effect (the layer that holds exactly these lamps)
   const sel = selected.length > 0 && selected.length < full!.patch.length ? selected : [];
+  // the previews show as many lamps as the effect would run on: the chosen ones, or (none chosen) all of them
+  const previewLamps = Math.min(16, Math.max(1, selected.length || full!.patch.length));
   const selKey = [...sel].sort().join(",");
   const selLayer = sel.length ? layers.find((l) => !l.source && l.fixtureIds && [...l.fixtureIds].sort().join(",") === selKey) : undefined;
   const layer = sel.length ? selLayer : target ? layers.find((l) => l.groupId === target) : undefined;
@@ -284,7 +286,7 @@ export function EffectsPanel({ selected = [], onDrag, requireSelection = false }
                 onPointerDown={onDrag ? (ev) => onDrag({ type: "effect", fx: e }, ev) : undefined}>
                 <span className="name">{name(e)}</span>
                 {/* always the moving example (while on screen), in the current colours and speed */}
-                <FxPreview index={e.index} fx={fx} lamps={Math.min(8, Math.max(4, full!.rig.heads))} />
+                <FxPreview index={e.index} fx={fx} lamps={previewLamps} />
                 {active ? <span className="badge">{t("fx.running")}</span> : e.uses.includes("Audio") || e.uses.includes("Beat") ? <span className="fx-new">♪</span> : null}
                 <span className={"fx-fav" + (favs.includes(e.key) ? " on" : "")} role="button" aria-label={t("fx.fav")} title={t("fx.fav")}
                   onClick={(ev) => { ev.stopPropagation(); toggleFav(e.key); }}>★</span>

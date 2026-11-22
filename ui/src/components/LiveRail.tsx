@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { api, type EffectInfo } from "../api";
 import { useT } from "../i18n";
 import { onLinux, useLive, useShow } from "../store";
@@ -6,26 +7,74 @@ import { Icon } from "./Icon";
 /** Opens a page by id (the setup behind a card). */
 const go = (page: string) => window.dispatchEvent(new CustomEvent("dmx-goto", { detail: page }));
 
+const search = () => window.dispatchEvent(new Event("dmx-search"));
+
 /**
- * The column on the right of every page: what the light listens to and looks at, and what runs now. The
+ * The column on the right of every page: search on top, then what the light listens to and looks at. The
  * settings behind each card (input, keystone, markers) open with the gear; during a show this is all you need.
- * Folded in, only the sound meters stay.
+ * What runs now sits in the top bar (<see NowButton>). Folded in, only search and the sound meters stay.
  */
 export function LiveRail({ folded, onFold }: { folded: boolean; onFold: () => void; page?: string; selected?: string[] }) {
   const t = useT();
   return (
     <aside className={"rail" + (folded ? " folded" : "")}>
-      <button className="rail-fold" onClick={onFold} title={folded ? t("rail.unfold") : t("rail.fold")} aria-label={folded ? t("rail.unfold") : t("rail.fold")}>
-        <Icon name={folded ? "chevron-left" : "chevron-right"} size={16} />
-      </button>
+      <div className="rail-top">
+        <button className="rail-fold" onClick={onFold} title={folded ? t("rail.unfold") : t("rail.fold")} aria-label={folded ? t("rail.unfold") : t("rail.fold")}>
+          <Icon name={folded ? "chevron-left" : "chevron-right"} size={16} />
+        </button>
+        {folded
+          ? <button className="rail-fold" onClick={search} title={t("cmd.title") + " (Ctrl+K)"} aria-label={t("cmd.title")}><Icon name="search" size={16} /></button>
+          : <button className="btn rail-search" onClick={search} title={t("cmd.title") + " (Ctrl+K)"}>
+              <Icon name="search" /> <span className="grow">{t("cmd.short")}</span> <kbd>Ctrl K</kbd>
+            </button>}
+      </div>
       {folded ? <Meters small /> : (
         <>
           <SoundCard />
           {!onLinux() && <ScreenCard />}
-          <NowCard />
         </>
       )}
     </aside>
+  );
+}
+
+/** "Nu actief" in the top bar: what runs now in one line; a click opens the full list (stop buttons included). */
+export function NowButton() {
+  const t = useT();
+  const { full, boot } = useShow();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc);
+    return () => { window.removeEventListener("pointerdown", away); window.removeEventListener("keydown", esc); };
+  }, [open]);
+  if (!full || !boot) return null;
+  const s = full.state;
+  const fx = s.effect;
+  const chase = fx.chaseId ? (s.chases ?? []).find((c) => c.id === fx.chaseId) : undefined;
+  const info = boot.effects[fx.effectIndex];
+  const main = s.mode !== "effect" ? null
+    : fx.screenSync ? t("rail.screen")
+    : chase ? chase.name
+    : info ? t("fxname." + info.key, undefined, info.name) : null;
+  const scene = full.scenes.find((x) => x.id === s.activeScene);
+  const more = s.layers.filter((l) => !l.source).length;
+  const text = s.blackout ? t("rail.blackout") : main ?? (scene ? scene.name : s.mode === "faders" ? t("rail.faders") : t("now.static"));
+  return (
+    <div className="now-wrap" ref={ref}>
+      <button className={"btn ghost now-btn" + (main || more ? " running" : "") + (open ? " active" : "")} onClick={() => setOpen(!open)}
+        title={t("rail.now")} aria-expanded={open}>
+        <Icon name="sparkles" size={16} />
+        <span className="now-label">{t("rail.now")}:</span>
+        <span className="now-text">{text}</span>
+        {more > 0 && <span className="chip now-more">+{more}</span>}
+      </button>
+      {open && <div className="now-pop"><NowCard /></div>}
+    </div>
   );
 }
 
@@ -119,7 +168,7 @@ function ScreenCard() {
   );
 }
 
-function NowCard() {
+export function NowCard() {
   const t = useT();
   const { full, boot } = useShow();
   const s = full!.state;

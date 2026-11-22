@@ -402,6 +402,7 @@ export const en: Record<string, string> = {
   "scenes.lamps": "{n} lamps",
   "scenes.lampsHint": "Saved with only these lamps chosen: the preset changes only those lamps, and lands on their rows on the timeline.",
   "tl.rowsHint": "Top row = all lamps, below it each lamp. Drag colours and effects onto a row; a preset lands on the rows of its lamps by itself.",
+  "now.static": "Fixed colours",
   "nav.music": "Music",
   "music.title": "Music",
   "music.listening": "Listening",
